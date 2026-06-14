@@ -1,36 +1,51 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
-#include <Geode/modify/PlayerObject.hpp>
+#include <Geode/modify/PlayLayer.hpp>
 #include <chizz.continuous-physics-api/include/ContinuousPhysics.hpp>
 
 using namespace geode::prelude;
 using namespace continuousphysics::prelude;
 
-class $modify(PlayerObject) {
-	void update(float dt) {
-		if (useVanillaPhysics()) {
-			PlayerObject::update(dt);
-			return;
+static bool s_cbfPlusEnabled = true;
+
+class $modify(PlayLayer) {
+	bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
+		bool result = PlayLayer::init(level, useReplay, dontCreateObjects);
+		if (!result) return false;
+
+		if (s_cbfPlusEnabled) {
+			this->m_clickBetweenSteps = false;
+			this->m_clickOnSteps = false;
 		}
 
-		preTick(this);
-		PlayerObject::update(dt);
-		postTick(this, dt);
+		return true;
+	}
+
+	void resetLevel() {
+		PlayLayer::resetLevel();
+
+		if (s_cbfPlusEnabled) {
+			this->m_clickBetweenSteps = false;
+			this->m_clickOnSteps = false;
+		}
 	}
 };
 
 class $modify(GJBaseGameLayer) {
+	static void onModify(auto& self) {
+		(void) self.setHookPriority(
+			"GJBaseGameLayer::processQueuedButtons", Priority::VeryEarly);
+	}
+
 	void processQueuedButtons(float dt, bool clearInputQueue) {
-		if (useVanillaPhysics()) {
+		if (!s_cbfPlusEnabled || useVanillaPhysics()) {
 			GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
 			return;
 		}
 
-		double tickEnd = static_cast<double>(dt) + this->m_timestamp;
-
-		processInputs(this->m_player1, tickEnd);
+		processInputs(this->m_player1, dt);
 		if (this->m_gameState.m_isDualMode && this->m_player2) {
-			processInputs(this->m_player2, tickEnd);
+			processInputs(this->m_player2, dt);
 		}
 
 		this->m_queuedButtons.clear();
@@ -41,6 +56,7 @@ class $modify(GJBaseGameLayer) {
 $on_mod(Loaded) {
 	auto mod = Mod::get();
 	auto& config = Config::get();
+
 	// Input Hz
 	config.setInputHz(mod->getSettingValue<float>("input-hz"));
 	listenForSettingChanges<float>(
@@ -56,22 +72,24 @@ $on_mod(Loaded) {
 			toggleVelocityUnroundingPatches(val);
 		});
 
-	// Mod active
-	config.setModActive(!mod->getSettingValue<bool>("mod-disabled"));
+	// CBF+ toggle
+	s_cbfPlusEnabled = !mod->getSettingValue<bool>("mod-disabled");
 	listenForSettingChanges<bool>(
 		"mod-disabled", +[](bool val) {
-			Config::get().setModActive(!val);
-			PlayLayer* pl = PlayLayer::get();
-			if (pl) {
+			s_cbfPlusEnabled = !val;
+			PlayLayer* playLayer = PlayLayer::get();
+			// clang-format off
+			if (playLayer) {
 				if (val) {
-					// restore vanilla CBS/COS settings
-					auto* gm = GameManager::sharedState();
-					pl->m_clickBetweenSteps = gm->getGameVariable("0177");
-					pl->m_clickOnSteps = gm->getGameVariable("0176");
+					// copied from legacy cbf
+					auto* gameManager = GameManager::sharedState();
+					playLayer->m_clickBetweenSteps = gameManager->getGameVariable("0177");
+					playLayer->m_clickOnSteps = gameManager->getGameVariable("0176");
 				} else {
-					pl->m_clickBetweenSteps = false;
-					pl->m_clickOnSteps = false;
+					playLayer->m_clickBetweenSteps = false;
+					playLayer->m_clickOnSteps = false;
 				}
 			}
+			// clang-format on
 		});
 }
