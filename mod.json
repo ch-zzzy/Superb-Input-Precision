@@ -5,7 +5,7 @@
 	},
 	"id": "chizz.cbf-plus",
 	"name": "CBF+",
-	"version": "v1.0.0",
+	"version": "v0.1.0",
 	"developer": "chizz",
 	"description": "Reworks physics for input interpolation.",
 	"tags": [
@@ -18,8 +18,8 @@
 		"source": "https://github.com/ch-zzzy/GD-CBF-Plus"
 	},
 	"dependencies": {
-		"chizz.continuous-physics-api": {
-			"version": ">=v1.0.0",
+		"chizz.subtick-inputs-api": {
+			"version": ">=v0.0.0",
 			"required": true
 		}
 	},
@@ -31,7 +31,7 @@
 		},
 		"input-hz": {
 			"name": "Input Refresh Rate (Hz)",
-			"description": "How frequently the game checks for your input. Higher values = more responsive/precise. Set to 240 for vanilla click-on-steps behavior, 480 for CBS equivalent, max to replicate syzzi's CBF.",
+			"description": "How frequently the game checks for your input. Higher values = more responsive/precise. Set to 240 for vanilla click-on-steps behavior, 480 for CBS equivalent, or use \"Instantaneous Inputs\" for legacy CBF behavior.",
 			"type": "float",
 			"default": 240,
 			"min": 60,
@@ -39,6 +39,12 @@
 			"control": {
 				"slider": false
 			}
+		},
+		"instant-inputs": {
+			"name": "Instantaneous Inputs",
+			"description": "Whether to apply inputs immediately, overriding the input refresh rate.",
+			"type": "bool",
+			"default": false
 		},
 		"dangerous-settings": {
 			"name": "Dangerous Settings",
@@ -48,7 +54,7 @@
 		},
 		"velocity-unrounding": {
 			"name": "Velocity Unrounding",
-			"description": "Implementation of Velocity Unrounding, which prevents the game from rounding y-velocity to 3 decimal places.",
+			"description": "Implementation of the Velocity UnRounding mod, which prevents the game from rounding y-velocity to 3 decimal places.",
 			"type": "bool",
 			"default": false,
 			"enable-if": "dangerous-settings",

@@ -1,56 +1,57 @@
-# CBF+ (WIP)
+# CBF+
 
 ## What does it do?
 
-This mod completely reworks the discrete tick-by-tick method Geometry Dash uses for physics. Using kinematic formulas, the mod can interpolate the player's position and velocity at any point in time. The main impact of this is to be able to separate ticks per second and input refresh rate. Meaning the physics can update at some independent rate from the input rate allowing for customizable precision.
+CBF+ lets your inputs register at a much finer resolution than vanilla's discrete ticks, while keeping the physics faithful to vanilla. Vanilla normally processes queued inputs for the tick all at once. CBF+ tracks where in the tick they should be, so your clicks land when you actually want them to.
+
+It's built on top of the [Subtick Inputs API](https://github.com/ch-zzzy/Subtick-Inputs-API), which handles the displacement correction.
 
 ## Why did I make this mod?
 
-Click Between Steps and Click Between Frames both use a method called "tick splitting" to allow
-sub-tick inputs. When an input lands between two ticks, the tick gets split into two or more smaller steps that run independently.  
-(Vanilla Click Between Steps is slightly different as it forces no more than one split per tick)
+Click Between Steps and Click Between Frames both use a method called **tick splitting** to allow sub-tick inputs. When an input lands between two ticks, the tick gets split into two or more smaller ticks that run independently.
+(Vanilla Click Between Steps is slightly different as it allows no more than one split right in the middle.)
 
-For example, a cube at 1x speed falling under gravity at 240 TPS:
+The problem is that tick splitting **doesn't reproduce vanilla physics exactly** for gravity based modes. For example, a cube at 1x speed falling under gravity at 240 TPS:
 
-- Gravity per tick: `0.958199 * (54/240) = 0.215594775` vels/tick
-- Starting velocity: 0 vels
+- Gravity per tick: `0.958199 * (54/240) = 0.215594775` yvels/tick
+- Starting velocity: 0 yvels
 
-**Vanilla (one full tick):**  
-`v = 0 - 0.215594775 = -0.215594775`  
+**Vanilla (one full tick):**
+`v = 0 - 0.215594775 = -0.215594775`
 `dy = 0.225 * (-0.215594775) =` **-0.048508824375 units**
 
-****Tick split at 30% (two subticks of 0.3 and 0.7):****  
-**Step 1 (30%):**  
-`v = 0 - (0.215594775 * 0.3) = -0.0646784325`  
-`dy = 0.225 * 0.3 * (-0.0646784325) = -0.00436579419375`  
-**Step 2 (70%):**  
-`v = -0.0646784325 - (0.215594775 * 0.7) = -0.2158418575`  
+**Tick split at 30% (two subticks of 0.3 and 0.7):**
+**Step 1 (30%):**
+`v = 0 - (0.215594775 * 0.3) = -0.0646784325`
+`dy = 0.225 * 0.3 * (-0.0646784325) = -0.00436579419375`
+**Step 2 (70%):**
+`v = -0.0646784325 - (0.215594775 * 0.7) = -0.2158418575`
 `dy = 0.225 * 0.7 * (-0.2158418575) = -0.03399509255625`
 **Total dy = -0.03836088675 units**
 
-Those clearly don't match. This comes from gravity being applied to velocity before
-displacement in each subtick. Splitting one tick into two smaller ones changes the
-intermediate velocity, which changes the total displacement. The error varies with split position and can accumulate. Note that in actuality, velocity is rounded to 3 decimal places. For the sake of "simplicity" I decided to use the full non-rounded values in the example. In game the disparity may be even worse due to the lost precision.
+Those clearly don't match. This comes from gravity being applied to velocity before displacement in each subtick. Splitting one tick into two smaller ones changes the intermediate velocity, which changes the total displacement. The error varies with split position and can accumulate. (Note: in actuality, velocity is rounded to 3 decimal places. For the sake of "simplicity" I used the full non-rounded values here. In game the disparity may be even worse due to the lost precision.)
 
-This mod takes a different approach: instead of splitting ticks, it evaluates the player's position
-using a continuous formula that reproduces vanilla's physics exactly at every tick boundary.
-No need for tick splitting since ticks no longer handle inputs.  
-Inputs fire at the nearest input check (customizable in mod settings) without splitting anything since the formula gives the correct
-position for any point in time.  
-The result is sub-tick input precision with zero physics deviation
-from vanilla.
+## How it works
+
+Because tick splitting introduces that error for accelerating gamemodes, CBF+ takes a different approach. Vanilla still owns the physics and runs its normal ticks, but CBF+ (via the Subtick Inputs API) applies a Y-displacement correction so that an input applied partway through a tick produces the position vanilla would have produced if inputs were processed at that moment.
+
+Inputs fire at the nearest input check (rate is customizable in mod settings) or immediately (if Instantaneous Inputs is enabled), and the correction handles where the player should be.
+
+**Wave is the one exception:** because wave velocity is constant between inputs (no acceleration), tick splitting is exact for it because there's no intermediate-velocity error to introduce. So for wave, CBF+ splits the tick at the input point, which is the most accurate (and simplest) option. Every other gamemode uses the displacement correction instead.
+
+The result is sub-tick input precision that aims to stay faithful to vanilla physics.
 
 ## Future plans
 
 - Platformer support
-- 2.1 mode (use Velocity UnRounding and Enable 2.1 Subframes to replicate 2.1 physics. 2.1 exclusive bugs not yet available.)
-- Non-Windows support
+- 2.1 mode (use Velocity Unrounding for now, 2.1-exclusive bugs not yet available)
+- Non-Windows support (I won't be working on that until TulipHook adds midhooking)
 - Botting support
 
 ## Credits
 
-Thanks to syzzi for the original CBF idea, this was obviously heavily inspired by it.
+Thanks to syzzi for the original CBF idea this was obviously heavily inspired by it.
 
-## Contact
+## Bugs
 
-Recreating GD physics isn't the easiest of things to do so don't be surprised if you find any bugs. Feel free to message me on discord at @ch.zzy if you have any issues though.
+I'm not an expert modder or coder, so don't be surprised if you find any bugs. Please leave a [bug report](https://github.com/ch-zzzy/Subtick-Inputs-API/issues/new) on the API's page if you have any issues. (Most of the code is there so any bugs are almost definitely not from CBF+.)

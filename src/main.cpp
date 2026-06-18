@@ -1,10 +1,10 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#include <chizz.continuous-physics-api/include/ContinuousPhysics.hpp>
+#include <chizz.subtick-inputs-api/include/SubtickInputs.hpp>
 
 using namespace geode::prelude;
-using namespace continuousphysics::prelude;
+using namespace subtickinputs::prelude;
 
 static bool s_cbfPlusEnabled = true;
 
@@ -62,15 +62,19 @@ $on_mod(Loaded) {
 	listenForSettingChanges<float>(
 		"input-hz", +[](float val) { Config::get().setInputHz(val); });
 
+	// Instantaneous inputs
+	config.setInstantInputsEnabled(
+		mod->getSettingValue<bool>("instant-inputs"));
+	listenForSettingChanges<bool>(
+		"instant-inputs",
+		+[](bool val) { Config::get().setInstantInputsEnabled(val); });
+
 	// Velocity unrounding
 	config.setVelocityUnroundingEnabled(
 		mod->getSettingValue<bool>("velocity-unrounding"));
-	toggleVelocityUnroundingPatches(config.isVelocityUnroundingEnabled());
 	listenForSettingChanges<bool>(
-		"velocity-unrounding", +[](bool val) {
-			Config::get().setVelocityUnroundingEnabled(val);
-			toggleVelocityUnroundingPatches(val);
-		});
+		"velocity-unrounding",
+		+[](bool val) { Config::get().setVelocityUnroundingEnabled(val); });
 
 	// CBF+ toggle
 	s_cbfPlusEnabled = !mod->getSettingValue<bool>("mod-disabled");
