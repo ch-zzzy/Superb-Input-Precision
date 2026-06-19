@@ -76,7 +76,7 @@ $on_mod(Loaded) {
 		"velocity-unrounding",
 		+[](bool val) { Config::get().setVelocityUnroundingEnabled(val); });
 
-	// CBF+ toggle
+	// soft toggle
 	s_modEnabled = !mod->getSettingValue<bool>("mod-disabled");
 	listenForSettingChanges<bool>(
 		"mod-disabled", +[](bool val) {
@@ -85,7 +85,7 @@ $on_mod(Loaded) {
 			// clang-format off
 			if (playLayer) {
 				if (val) {
-					// copied from legacy cbf
+					// copied from cbf
 					auto* gameManager = GameManager::sharedState();
 					playLayer->m_clickBetweenSteps = gameManager->getGameVariable("0177");
 					playLayer->m_clickOnSteps = gameManager->getGameVariable("0176");
