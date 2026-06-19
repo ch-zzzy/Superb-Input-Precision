@@ -1,8 +1,8 @@
-# CBF+
+# Superb Input Precision
 
 ## What does it do?
 
-CBF+ lets your inputs register at a much finer resolution than vanilla's discrete ticks, while keeping the physics faithful to vanilla. Vanilla normally processes queued inputs for the tick all at once. CBF+ tracks where in the tick they should be, so your clicks land when you actually want them to.
+Superb Input Precision lets your inputs register at a much finer resolution than vanilla's discrete ticks, while keeping the physics faithful to vanilla. Vanilla normally processes queued inputs for the tick all at once. This mod tracks where in the tick they should be, so your clicks land when you actually want them to.
 
 It's built on top of the [Subtick Inputs API](https://github.com/ch-zzzy/Subtick-Inputs-API), which handles the displacement correction.
 
@@ -33,11 +33,11 @@ Those clearly don't match. This comes from gravity being applied to velocity bef
 
 ## How it works
 
-Because tick splitting introduces that error for accelerating gamemodes, CBF+ takes a different approach. Vanilla still owns the physics and runs its normal ticks, but CBF+ (via the Subtick Inputs API) applies a Y-displacement correction so that an input applied partway through a tick produces the position vanilla would have produced if inputs were processed at that moment.
+Because tick splitting introduces that error for accelerating gamemodes, Superb Input Precision takes a different approach. Vanilla still owns the physics and runs its normal ticks, but this mod (via the Subtick Inputs API) applies a Y-displacement correction so that an input applied partway through a tick produces the position vanilla would have produced if inputs were processed at that moment.
 
 Inputs fire at the nearest input check (rate is customizable in mod settings) or immediately (if Instantaneous Inputs is enabled), and the correction handles where the player should be.
 
-**Wave is the one exception:** because wave velocity is constant between inputs (no acceleration), tick splitting is exact for it because there's no intermediate-velocity error to introduce. So for wave, CBF+ splits the tick at the input point, which is the most accurate (and simplest) option. Every other gamemode uses the displacement correction instead.
+**Wave is the one exception:** because wave velocity is constant between inputs (no acceleration), tick splitting is exact for it because there's no intermediate-velocity error to introduce. So for wave, the tick is split at the input point, which is the most accurate (and simplest) option. Every other gamemode uses the displacement correction instead.
 
 The result is sub-tick input precision that aims to stay faithful to vanilla physics.
 
@@ -54,4 +54,4 @@ Thanks to syzzi for the original CBF idea this was obviously heavily inspired by
 
 ## Bugs
 
-I'm not an expert modder or coder, so don't be surprised if you find any bugs. Please leave a [bug report](https://github.com/ch-zzzy/Subtick-Inputs-API/issues/new) on the API's page if you have any issues. (Most of the code is there so any bugs are almost definitely not from CBF+.)
+I'm not an expert modder or coder, so don't be surprised if you find any bugs. Please leave a [bug report](https://github.com/ch-zzzy/Subtick-Inputs-API/issues/new) on the API's page if you have any issues. (Most of the code is there so any bugs are almost definitely not from Superb Input Precision.)

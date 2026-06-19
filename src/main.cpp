@@ -6,14 +6,14 @@
 using namespace geode::prelude;
 using namespace subtickinputs::prelude;
 
-static bool s_cbfPlusEnabled = true;
+static bool s_modEnabled = true;
 
 class $modify(PlayLayer) {
 	bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
 		bool result = PlayLayer::init(level, useReplay, dontCreateObjects);
 		if (!result) return false;
 
-		if (s_cbfPlusEnabled) {
+		if (s_modEnabled) {
 			this->m_clickBetweenSteps = false;
 			this->m_clickOnSteps = false;
 		}
@@ -24,7 +24,7 @@ class $modify(PlayLayer) {
 	void resetLevel() {
 		PlayLayer::resetLevel();
 
-		if (s_cbfPlusEnabled) {
+		if (s_modEnabled) {
 			this->m_clickBetweenSteps = false;
 			this->m_clickOnSteps = false;
 		}
@@ -38,7 +38,7 @@ class $modify(GJBaseGameLayer) {
 	}
 
 	void processQueuedButtons(float dt, bool clearInputQueue) {
-		if (!s_cbfPlusEnabled || useVanillaPhysics()) {
+		if (!s_modEnabled || useVanillaPhysics()) {
 			GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
 			return;
 		}
@@ -77,10 +77,10 @@ $on_mod(Loaded) {
 		+[](bool val) { Config::get().setVelocityUnroundingEnabled(val); });
 
 	// CBF+ toggle
-	s_cbfPlusEnabled = !mod->getSettingValue<bool>("mod-disabled");
+	s_modEnabled = !mod->getSettingValue<bool>("mod-disabled");
 	listenForSettingChanges<bool>(
 		"mod-disabled", +[](bool val) {
-			s_cbfPlusEnabled = !val;
+			s_modEnabled = !val;
 			PlayLayer* playLayer = PlayLayer::get();
 			// clang-format off
 			if (playLayer) {

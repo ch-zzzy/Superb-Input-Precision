@@ -3,11 +3,11 @@
 	"gd": {
 		"win": "2.2081"
 	},
-	"id": "chizz.cbf-plus",
-	"name": "CBF+",
+	"id": "chizz.superb-input-precision",
+	"name": "Superb Input Precision",
 	"version": "v0.1.0",
 	"developer": "chizz",
-	"description": "Reworks physics for input interpolation.",
+	"description": "Reworks input handling for subtick precision.",
 	"tags": [
 		"gameplay",
 		"enhancement",
@@ -15,7 +15,11 @@
 		"cheat"
 	],
 	"links": {
-		"source": "https://github.com/ch-zzzy/GD-CBF-Plus"
+		"source": "https://github.com/ch-zzzy/Superb-Input-Precision"
+	},
+	"issues": {
+		"info": "Report bugs on the API's github issue page.",
+		"url": "https://github.com/ch-zzzy/Subtick-Inputs-API/issues"
 	},
 	"dependencies": {
 		"chizz.subtick-inputs-api": {
@@ -38,7 +42,9 @@
 			"max": 10000,
 			"control": {
 				"slider": false
-			}
+			},
+			"enable-if": "!instant-inputs",
+			"enable-if-description": "You must disable \"Instantaneous Inputs\" to use this"
 		},
 		"instant-inputs": {
 			"name": "Instantaneous Inputs",
