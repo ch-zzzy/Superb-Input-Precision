@@ -11,7 +11,7 @@ It's built on top of the [Subtick Inputs API](https://github.com/ch-zzzy/Subtick
 Click Between Steps and Click Between Frames both use a method called **tick splitting** to allow sub-tick inputs. When an input lands between two ticks, the tick gets split into two or more smaller ticks that run independently.
 (Vanilla Click Between Steps is slightly different as it allows no more than one split right in the middle.)
 
-The problem is that tick splitting **doesn't reproduce vanilla physics exactly** for gravity based modes. For example, a cube at 1x speed falling under gravity at 240 TPS:
+The problem is that tick splitting doesn't reproduce vanilla physics exactly for gravity based modes. For example, a cube at 1x speed falling under gravity at 240 TPS:
 
 - Gravity per tick: `0.958199 * (54/240) = 0.215594775` yvels/tick
 - Starting velocity: 0 yvels
@@ -44,6 +44,7 @@ The result is sub-tick input precision that aims to stay faithful to vanilla phy
 ## Future plans
 
 - Platformer support
+- (optional) Sub-tick collision checks
 - 2.1 mode (use Velocity Unrounding for now, 2.1-exclusive bugs not yet available)
 - Non-Windows support (I won't be working on that until TulipHook adds midhooking)
 - Botting support

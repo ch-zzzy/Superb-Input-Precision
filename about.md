@@ -9,6 +9,7 @@ Please note: while the goal is vanilla-accurate physics, higher input precision 
 ## Future plans
 
 - Platformer support
+- (optional) Sub-tick collision checks
 - 2.1 mode (use Velocity Unrounding for now, 2.1-exclusive bugs not yet available)
 - Non-Windows support (I won't be working on that until TulipHook adds midhooking)
 - Botting support
