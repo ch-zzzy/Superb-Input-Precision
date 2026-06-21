@@ -38,17 +38,10 @@ class $modify(GJBaseGameLayer) {
 	}
 
 	void processQueuedButtons(float dt, bool clearInputQueue) {
-		if (!s_modEnabled || useVanillaPhysics()) {
-			GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
-			return;
+		if (s_modEnabled && !useVanillaPhysics()) {
+			processInputs(dt);
+			this->m_queuedButtons.clear();
 		}
-
-		processInputs(this->m_player1, dt);
-		if (this->m_gameState.m_isDualMode && this->m_player2) {
-			processInputs(this->m_player2, dt);
-		}
-
-		this->m_queuedButtons.clear();
 		GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
 	}
 };
