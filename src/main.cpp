@@ -38,9 +38,8 @@ class $modify(GJBaseGameLayer) {
 	}
 
 	void processQueuedButtons(float dt, bool clearInputQueue) {
-		if (s_modEnabled && !useVanillaPhysics()) {
+		if (s_modEnabled && !useVanilla()) {
 			processInputs(dt);
-			this->m_queuedButtons.clear();
 		}
 		GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
 	}
