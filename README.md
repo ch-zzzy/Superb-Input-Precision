@@ -46,12 +46,12 @@ The result is sub-tick input precision that aims to stay faithful to vanilla phy
 - Platformer support
 - (optional) Sub-tick collision checks
 - 2.1 mode (use Velocity Unrounding for now, 2.1-exclusive bugs not yet available)
-- Non-Windows support (I won't be working on that until TulipHook adds midhooking)
 - Botting support
 
 ## Credits
 
-Thanks to syzzi for the original CBF idea this was obviously heavily inspired by it.
+- Thanks to syzzi for the original CBF idea this was obviously heavily inspired by it.
+- Thanks to Alphalaneous for reverse engineering PlayerObject::update.
 
 ## Bugs
 

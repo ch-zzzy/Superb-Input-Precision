@@ -2,7 +2,7 @@
 
 ## v0.1.1
 
-- fixed p2 input doing nothing in non-dual mode
+- added non-windows support
 
 ## v0.1.0
 

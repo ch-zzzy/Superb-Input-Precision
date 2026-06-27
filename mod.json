@@ -23,7 +23,7 @@
 	},
 	"dependencies": {
 		"chizz.subtick-inputs-api": {
-			"version": ">=v0.3.0",
+			"version": ">=v0.3.1",
 			"required": true
 		}
 	},
@@ -56,13 +56,19 @@
 			"name": "Dangerous Settings",
 			"description": "These settings change physics from vanilla and are not recommended for general use.",
 			"type": "bool",
-			"default": false
+			"default": false,
+			"platforms": [
+				"win"
+			]
 		},
 		"velocity-unrounding": {
 			"name": "Velocity Unrounding",
 			"description": "Implementation of the Velocity UnRounding mod, which prevents the game from rounding y-velocity to 3 decimal places.",
 			"type": "bool",
 			"default": false,
+			"platforms": [
+				"win"
+			],
 			"enable-if": "dangerous-settings",
 			"enable-if-description": "You must enable \"Dangerous Settings\" to use this"
 		}
