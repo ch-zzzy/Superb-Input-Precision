@@ -8,7 +8,7 @@
 	},
 	"id": "chizz.superb-input-precision",
 	"name": "Superb Input Precision",
-	"version": "v0.1.1",
+	"version": "v0.1.2",
 	"developer": "chizz",
 	"description": "Reworks input handling for subtick precision.",
 	"tags": [
@@ -26,7 +26,7 @@
 	},
 	"dependencies": {
 		"chizz.subtick-inputs-api": {
-			"version": ">=v0.3.1",
+			"version": ">=v0.4.1",
 			"required": true
 		}
 	},
@@ -53,7 +53,7 @@
 			"name": "Instantaneous Inputs",
 			"description": "Whether to apply inputs immediately, overriding the input refresh rate.",
 			"type": "bool",
-			"default": false
+			"default": true
 		},
 		"dangerous-settings": {
 			"name": "Dangerous Settings",
