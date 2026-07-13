@@ -1,5 +1,5 @@
 {
-	"geode": "5.7.1",
+	"geode": "5.8.2",
 	"gd": {
 		"win": "2.2081",
 		"mac": "2.2081",
@@ -26,7 +26,7 @@
 	},
 	"dependencies": {
 		"chizz.subtick-inputs-api": {
-			"version": ">=v0.4.1",
+			"version": ">=v0.5.0",
 			"required": true
 		}
 	},
@@ -80,6 +80,8 @@
 		"syzzi.click_between_frames": ">=v1.0.0",
 		"zmx.cbf-lite": ">=v1.0.0",
 		"alphalaneous.click_after_frames": ">=v1.0.0",
-		"chizz.velocity-unrounding": ">=v1.0.0"
+		"chizz.velocity-unrounding": ">=v1.0.0",
+		"nytelyte.wave_trail_drag_fix": ">=v1.0.0",
+		"nytelyte.wave_trail_draw_fix": ">=v1.0.0"
 	}
 }
