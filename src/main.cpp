@@ -34,13 +34,17 @@ class $modify(PlayLayer) {
 class $modify(GJBaseGameLayer) {
 	static void onModify(auto& self) {
 		(void) self.setHookPriority(
-			"GJBaseGameLayer::processQueuedButtons", Priority::VeryEarly);
+			"GJBaseGameLayer::processQueuedButtons", Priority::Replace);
 	}
 
 	void processQueuedButtons(float dt, bool clearInputQueue) {
 		if (s_modEnabled && !useVanilla()) {
+			// im forseeing issues if any other mod actually uses the api since the queue gets cleared every call...
+			// but that's a problem for future chizz
 			processInputs(dt);
 		}
+
+		// practically a no-op if processInputs was called
 		GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
 	}
 };

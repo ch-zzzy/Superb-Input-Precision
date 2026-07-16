@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.3
+
+- changed processQueuedButtons hook priority
+
 ## v0.1.2
 
 - made Instantaneous Inputs on by default
