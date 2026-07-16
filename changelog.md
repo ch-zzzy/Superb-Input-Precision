@@ -3,6 +3,8 @@
 ## v0.1.3
 
 - changed processQueuedButtons hook priority
+- bump geode version
+- mark wave trail drag/draw fix as incompatiblities
 
 ## v0.1.2
 
