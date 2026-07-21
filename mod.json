@@ -8,7 +8,7 @@
 	},
 	"id": "chizz.superb-input-precision",
 	"name": "Superb Input Precision",
-	"version": "v0.1.3",
+	"version": "v0.1.4",
 	"developer": "chizz",
 	"description": "Reworks input handling for subtick precision.",
 	"tags": [
@@ -26,7 +26,7 @@
 	},
 	"dependencies": {
 		"chizz.subtick-inputs-api": {
-			"version": ">=v0.5.0",
+			"version": ">=v0.6.0",
 			"required": true
 		}
 	},

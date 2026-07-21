@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.4
+
+- bump api ver
+- let api handle cbs/cos disabling
+
 ## v0.1.3
 
 - changed processQueuedButtons hook priority

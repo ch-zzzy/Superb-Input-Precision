@@ -1,35 +1,11 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
-#include <Geode/modify/PlayLayer.hpp>
 #include <chizz.subtick-inputs-api/include/SubtickInputs.hpp>
 
 using namespace geode::prelude;
 using namespace subtickinputs::prelude;
 
 static bool s_modEnabled = true;
-
-class $modify(PlayLayer) {
-	bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
-		bool result = PlayLayer::init(level, useReplay, dontCreateObjects);
-		if (!result) return false;
-
-		if (s_modEnabled) {
-			this->m_clickBetweenSteps = false;
-			this->m_clickOnSteps = false;
-		}
-
-		return true;
-	}
-
-	void resetLevel() {
-		PlayLayer::resetLevel();
-
-		if (s_modEnabled) {
-			this->m_clickBetweenSteps = false;
-			this->m_clickOnSteps = false;
-		}
-	}
-};
 
 class $modify(GJBaseGameLayer) {
 	static void onModify(auto& self) {
@@ -57,7 +33,7 @@ $on_mod(Loaded) {
 	config.setInputHz(mod->getSettingValue<float>("input-hz"));
 
 	listenForSettingChanges<float>(
-		"input-hz", +[](float val) { Config::get().setInputHz(val); });
+		"input-hz", [](float val) { Config::get().setInputHz(val); });
 
 	listenForInputHzChanges(
 		[mod](float val) { mod->setSettingValue<float>("input-hz", val); });
@@ -66,9 +42,8 @@ $on_mod(Loaded) {
 	config.setInstantInputsEnabled(
 		mod->getSettingValue<bool>("instant-inputs"));
 
-	listenForSettingChanges<bool>(
-		"instant-inputs",
-		+[](bool val) { Config::get().setInstantInputsEnabled(val); });
+	listenForSettingChanges<bool>("instant-inputs",
+		[](bool val) { Config::get().setInstantInputsEnabled(val); });
 
 	listenForInstantInputsChanges(
 		[mod](bool val) { mod->setSettingValue<bool>("instant-inputs", val); });
@@ -77,9 +52,8 @@ $on_mod(Loaded) {
 	config.setVelocityUnroundingEnabled(
 		mod->getSettingValue<bool>("velocity-unrounding"));
 
-	listenForSettingChanges<bool>(
-		"velocity-unrounding",
-		+[](bool val) { Config::get().setVelocityUnroundingEnabled(val); });
+	listenForSettingChanges<bool>("velocity-unrounding",
+		[](bool val) { Config::get().setVelocityUnroundingEnabled(val); });
 
 	listenForVelocityUnroundingChanges([mod](bool val) {
 		mod->setSettingValue<bool>("velocity-unrounding", val);
@@ -89,21 +63,5 @@ $on_mod(Loaded) {
 	s_modEnabled = !mod->getSettingValue<bool>("mod-disabled");
 
 	listenForSettingChanges<bool>(
-		"mod-disabled", +[](bool val) {
-			s_modEnabled = !val;
-			PlayLayer* playLayer = PlayLayer::get();
-			// clang-format off
-			if (playLayer) {
-				if (val) {
-					// copied from cbf
-					auto* gameManager = GameManager::sharedState();
-					playLayer->m_clickBetweenSteps = gameManager->getGameVariable("0177");
-					playLayer->m_clickOnSteps = gameManager->getGameVariable("0176");
-				} else {
-					playLayer->m_clickBetweenSteps = false;
-					playLayer->m_clickOnSteps = false;
-				}
-			}
-			// clang-format on
-		});
+		"mod-disabled", +[](bool val) { s_modEnabled = !val; });
 }
