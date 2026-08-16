@@ -4,8 +4,6 @@
 
 Superb Input Precision lets your inputs register at a much finer resolution than vanilla's discrete ticks, while keeping the physics faithful to vanilla. Vanilla normally processes queued inputs for the tick all at once. This mod tracks where in the tick they should be, so your clicks land when you actually want them to.
 
-It's built on top of the [Subtick Inputs API](https://github.com/ch-zzzy/Subtick-Inputs-API), which handles the displacement correction.
-
 ## Why did I make this mod?
 
 Click Between Steps and Click Between Frames both use a method called **tick splitting** to allow sub-tick inputs. When an input lands between two ticks, the tick gets split into two or more smaller ticks that run independently.
@@ -51,7 +49,6 @@ The result is sub-tick input precision that aims to stay faithful to vanilla phy
 ## Credits
 
 - Thanks to syzzi for the original CBF idea, this was obviously heavily inspired by it. [CBF Github](https://github.com/theyareonit/Click-Between-Frames)
-- Thanks to Alphalaneous for reverse engineering PlayerObject::update(), the mod would not be available for non-windows without it. [hsaD yrtemoeG Github](https://github.com/Alphalaneous/hsaD-yrtemoeG)
 
 ## Bugs
 

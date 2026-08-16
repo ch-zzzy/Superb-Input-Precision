@@ -8,15 +8,13 @@ Please note: while the goal is vanilla-accurate physics, higher input precision 
 
 ## Future plans
 
-- Platformer support
-- (optional) Sub-tick collision checks
+- Platformer keys support
 - 2.1 mode (use Velocity Unrounding for now, 2.1-exclusive bugs not yet available)
 - Botting support
 
 ## Credits
 
 - Thanks to syzzi for the original CBF idea, this was obviously heavily inspired by it. [CBF Github](https://github.com/theyareonit/Click-Between-Frames)
-- Thanks to Alphalaneous for reverse engineering PlayerObject::update(), the mod would not be available for non-windows without it. [hsaD yrtemoeG Github](https://github.com/Alphalaneous/hsaD-yrtemoeG)
 
 ## Bugs
 

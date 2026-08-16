@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.0-beta.1
+
+- merged Subtick Inputs API with this mod, nothing functionally changed
+
 ## v0.1.4
 
 - bump api ver

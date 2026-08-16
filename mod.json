@@ -1,5 +1,5 @@
 {
-	"geode": "5.8.2",
+	"geode": "5.9.0",
 	"gd": {
 		"win": "2.2081",
 		"mac": "2.2081",
@@ -8,7 +8,7 @@
 	},
 	"id": "chizz.superb-input-precision",
 	"name": "Superb Input Precision",
-	"version": "v0.1.4",
+	"version": "v1.0.0-beta.1",
 	"developer": "chizz",
 	"description": "Reworks input handling for subtick precision.",
 	"tags": [
@@ -21,20 +21,14 @@
 		"source": "https://github.com/ch-zzzy/Superb-Input-Precision"
 	},
 	"issues": {
-		"info": "Report bugs on the API's github issue page.",
-		"url": "https://github.com/ch-zzzy/Subtick-Inputs-API/issues"
-	},
-	"dependencies": {
-		"chizz.subtick-inputs-api": {
-			"version": ">=v0.6.0",
-			"required": true
-		}
+		"info": "Report bugs on the mod's github issue page.",
+		"url": "https://github.com/ch-zzzy/Superb-Input-Precision/issues"
 	},
 	"settings": {
-		"mod-disabled": {
-			"name": "Disable Mod",
+		"mod-enabled": {
+			"name": "Enable Mod",
 			"type": "bool",
-			"default": false
+			"default": true
 		},
 		"input-hz": {
 			"name": "Input Refresh Rate (Hz)",
@@ -54,6 +48,12 @@
 			"description": "Whether to apply inputs immediately, overriding the input refresh rate.",
 			"type": "bool",
 			"default": true
+		},
+		"debug-mode": {
+			"type": "bool",
+			"default": false,
+			"name": "Debug Mode",
+			"description": "Enables logging for debugging purposes. Does not alter any functionality."
 		},
 		"dangerous-settings": {
 			"name": "Dangerous Settings",
@@ -80,7 +80,7 @@
 		"syzzi.click_between_frames": ">=v1.0.0",
 		"zmx.cbf-lite": ">=v1.0.0",
 		"alphalaneous.click_after_frames": ">=v1.0.0",
-		"chizz.velocity-unrounding": ">=v1.0.0",
+		"chizz.velocity-unrounding": "<=v1.0.6",
 		"nytelyte.wave_trail_drag_fix": ">=v1.0.0",
 		"nytelyte.wave_trail_draw_fix": ">=v1.0.0"
 	}
