@@ -18,4 +18,4 @@ Please note: while the goal is vanilla-accurate physics, higher input precision 
 
 ## Bugs
 
-I'm not an expert modder or coder, so don't be surprised if you find any bugs. Please leave a [bug report](https://github.com/ch-zzzy/Subtick-Inputs-API/issues/new?template=bug-report.yml) on the API's page if you have any issues. (Most of the code is there so any bugs are almost definitely not from Superb Input Precision.)
+I'm not an expert modder or coder, so don't be surprised if you find any bugs. Please leave a [bug report](https://github.com/ch-zzzy/Superb-Input-Precision/issues/new?template=bug-report.yml) on the github page if you have any issues.
