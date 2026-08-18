@@ -23,7 +23,16 @@ $on_mod(Loaded) {
 				playLayer->m_clickOnSteps = gameManager->getGameVariable("0176");
 			} else {
 				playLayer->m_clickBetweenSteps = false;
-				playLayer->m_clickOnSteps = false;
+
+				/* 
+					vanilla always expects all inputs to be processed on the first tick (aka step)
+					of any given frame when cbs and cos are both disabled
+					enabling cos alone causes the first tick to defer inputs to the second tick of the frame if needed
+					and so on up until the final tick of the frame, at which point all remaining inputs are processed
+					(honestly there is zero reason robtop should have even made cos a setting able to be disabled but 🤷‍♂️)
+					took a while to figure out since i mainly tested on 240fps where there is only ever one tick per frame
+				*/
+				playLayer->m_clickOnSteps = true;
 			}
 		}
 	});
@@ -49,7 +58,7 @@ class $modify(PlayLayer) {
 
 		if (config::modEnabled) {
 			this->m_clickBetweenSteps = false;
-			this->m_clickOnSteps = false;
+			this->m_clickOnSteps = true;
 		}
 
 		return true;
@@ -60,7 +69,7 @@ class $modify(PlayLayer) {
 
 		if (config::modEnabled) {
 			this->m_clickBetweenSteps = false;
-			this->m_clickOnSteps = false;
+			this->m_clickOnSteps = true;
 		}
 	}
 };

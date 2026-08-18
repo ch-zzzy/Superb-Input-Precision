@@ -12,7 +12,7 @@ body:
     attributes:
       label: List of Mods
       description: go to geode settings then click copy mods list and paste it here
-      placeholder: cool chizz mods (and others maybe)
+      placeholder: paste ALL of your mods list here not actually just my mod 🫩🙏
     validations:
       required: true
 
@@ -28,7 +28,7 @@ body:
   - type: textarea
     id: media
     attributes:
-      label: Extra Media
+      label: Media
       description: if possible, put any images or videos related to the bug here
     validations:
       required: false
@@ -55,7 +55,7 @@ body:
     attributes:
       label: Verification
       options:
-      - label: I verify that Subtick Inputs API, and whichever mods need it, are fully updated.
+      - label: I verify that Superb Input Precision is fully updated.
     validations:
       required: true
 

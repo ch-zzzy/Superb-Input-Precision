@@ -39,6 +39,11 @@ void SIPlayerObject::update(float dt) {
 
 		PlayerObject::update(segment * dt);
 
+		if (config::debugModeEnabled) {
+			log::debug("processing wave input: ratio={}, segment={}, isPush={}", input.m_ratio,
+				segment, input.m_isPush);
+		}
+
 		if (firstLoop && ((this->m_yVelocity < 0) ^ this->m_isUpsideDown)) {
 			this->m_isOnGround = startedOnGround;
 		}

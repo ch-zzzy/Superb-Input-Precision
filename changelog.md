@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.0-beta.2
+
+- force *enabled* click on steps such that inputs are not always processed on the first frame of the tick (caused issues when there is more than one tick in a frame, e.g. <240fps)
+
 ## v1.0.0-beta.1
 
 - merged Subtick Inputs API with this mod, nothing functionally changed

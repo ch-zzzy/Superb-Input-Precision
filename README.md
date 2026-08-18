@@ -42,7 +42,6 @@ The result is sub-tick input precision that aims to stay faithful to vanilla phy
 ## Future plans
 
 - Platformer support
-- (optional) Sub-tick collision checks
 - 2.1 mode (use Velocity Unrounding for now, 2.1-exclusive bugs not yet available)
 - Botting support
 
@@ -52,4 +51,4 @@ The result is sub-tick input precision that aims to stay faithful to vanilla phy
 
 ## Bugs
 
-I'm not an expert modder or coder, so don't be surprised if you find any bugs. Please leave a [bug report](https://github.com/ch-zzzy/Superb-Input-Precision/issues/new?template=bug-report.yml) on the github page if you have any issues.
+I'm not an expert modder or coder, so don't be surprised if you find any bugs. Please leave a [bug report](https://github.com/ch-zzzy/Superb-Input-Precision/issues/new?template=bug-report.yml) if you have any issues.

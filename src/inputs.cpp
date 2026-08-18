@@ -158,11 +158,6 @@ static void processInputs(float dt) {
 
 		double currentTime = input.m_timestamp;
 
-		// something is off with this
-		// when i expect 0.5 i consistently get 0.49999997392296924
-		// or 0.25 giving 0.24999998696148462
-		// all consistently off by 0.00000521540615%
-		// i'll leave it for now
 		double ratio = (currentTime - tickStartTime) / tickDuration;
 		ratio = std::clamp(ratio, 0.0, 1.0);
 
