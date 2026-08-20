@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.0-beta.4
+
+- forgot something
+
 ## v1.0.0-beta.3
 
 - (experimental) added functions for botting compatibility
