@@ -1,9 +1,12 @@
+#define GEODE_DEFINE_EVENT_EXPORTS
+
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
 
+#include "../include/InputQueue.hpp"
 #include "SIPlayerObject.hpp"
 #include "SubtickInputs.hpp"
 
@@ -245,3 +248,53 @@ static void processInputs(float dt) {
 
 	inputQueue.erase(inputQueue.begin(), inputQueue.begin() + processedCount);
 }
+
+namespace subtickinputs {
+	Result<std::vector<PlayerButtonCommandWithRatio>> getInputQueueWithRatios(float dt) {
+		auto* playLayer = PlayLayer::get();
+		if (!playLayer) return Err("playlayer is null");
+
+		double tps = 1.0 / dt;
+		double inputChecksPerTick = config::inputHz / tps;
+
+		double tickDuration = dt;
+		double tickStartTime = playLayer->m_timestamp;
+		double tickEndTime = tickStartTime + tickDuration;
+
+		std::vector<PlayerButtonCommandWithRatio> result;
+
+		for (auto& input : playLayer->m_queuedButtons) {
+			double currentTime = input.m_timestamp;
+
+			double ratio = (currentTime - tickStartTime) / tickDuration;
+			ratio = std::clamp(ratio, 0.0, 1.0);
+
+			if (!config::instantInputsEnabled) {
+				if (inputChecksPerTick > 1.0) {
+					ratio = std::floor(ratio * inputChecksPerTick) / inputChecksPerTick;
+				} else {
+					ratio = 0.0;
+				}
+			}
+
+			result.push_back({input, ratio});
+		}
+
+		return Ok(std::move(result));
+	}
+
+	Result<void> setInputQueueWithRatios(
+		std::vector<PlayerButtonCommandWithRatio> inputQueue, float dt) {
+		auto* playLayer = PlayLayer::get();
+		if (!playLayer) return Err("playlayer is null");
+
+		// no way this works 😂
+		playLayer->m_queuedButtons.clear();
+		for (auto& inputWithRatio : inputQueue) {
+			auto& inputWithoutRatio = inputWithRatio.input;
+			inputWithoutRatio.m_timestamp = playLayer->m_timestamp + inputWithRatio.ratio * dt;
+			playLayer->m_queuedButtons.push_back(inputWithoutRatio);
+		}
+		return Ok();
+	}
+} // namespace subtickinputs
