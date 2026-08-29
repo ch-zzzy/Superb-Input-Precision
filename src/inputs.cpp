@@ -184,10 +184,10 @@ static void processInputs(float dt) {
 		}
 
 		double preVel1 = p1 ? p1->m_yVelocity : 0.0;
-		float preDv1 = p1 ? getGravPerTick(p1, scaledDt) : 0.0;
+		double preDv1 = p1 ? getGravPerTick(p1, scaledDt) : 0.0;
 
 		double preVel2 = p2 ? p2->m_yVelocity : 0.0;
-		float preDv2 = p2 ? getGravPerTick(p2, scaledDt) : 0.0;
+		double preDv2 = p2 ? getGravPerTick(p2, scaledDt) : 0.0;
 
 		s_updateJumpCalledP1 = false;
 		s_updateJumpCalledP2 = false;
@@ -201,9 +201,10 @@ static void processInputs(float dt) {
 			if (!s_updateJumpCalledP1) p1->updateJump(0.0f);
 
 			double postVel = p1->m_yVelocity;
-			float postDv = getGravPerTick(p1, scaledDt);
+			double postDv = getGravPerTick(p1, scaledDt);
 
 			adjustedYVel1 += ratio * ((preVel1 - postVel) + (preDv1 - postDv));
+			// p1->m_yVelocity -= ratio * postDv;
 
 			if (config::debugModeEnabled) {
 				log::debug(
@@ -218,9 +219,10 @@ static void processInputs(float dt) {
 			if (!s_updateJumpCalledP2) p2->updateJump(0.0f);
 
 			double postVel = p2->m_yVelocity;
-			float postDv = getGravPerTick(p2, scaledDt);
+			double postDv = getGravPerTick(p2, scaledDt);
 
 			adjustedYVel2 += ratio * ((preVel2 - postVel) + (preDv2 - postDv));
+			// p2->m_yVelocity -= ratio * postDv;
 
 			if (config::debugModeEnabled) {
 				log::debug(

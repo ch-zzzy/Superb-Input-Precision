@@ -1,8 +1,16 @@
 # Changelog
 
+**Please keep in mind that Superb Input Precision is STILL in beta and bugs should be expected,
+not excluding physics-breaking bugs.** (totally not hinting at anything)
+
+## v1.0.0-beta.5
+
+- removed wave trail drag/draw fix incompatibility marks since i didn't see any major issues (just don't click multiple times in the same frame or whatever)
+- made postDv a double
+
 ## v1.0.0-beta.4
 
-- forgot something
+- forgot header
 
 ## v1.0.0-beta.3
 
@@ -10,7 +18,7 @@
 
 ## v1.0.0-beta.2
 
-- force *enabled* click on steps such that inputs are not always processed on the first frame of the tick (caused issues when there is more than one tick in a frame, e.g. <240fps)
+- force *enabled* click on steps such that inputs are not always processed on the first tick of the frame (caused issues when there is more than one tick in a frame, e.g. <240fps)
 
 ## v1.0.0-beta.1
 
