@@ -1,7 +1,12 @@
 # Changelog
 
 **Please keep in mind that Superb Input Precision is STILL in beta and bugs should be expected,
-not excluding physics-breaking bugs.** (totally not hinting at anything)
+not excluding physics-breaking bugs.**
+
+## v1.0.0-beta.6
+
+- added a yvel adjustment
+- fixed a force block issue with PlayerObject::update rewrite and some other oversights
 
 ## v1.0.0-beta.5
 

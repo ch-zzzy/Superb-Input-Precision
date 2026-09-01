@@ -15,6 +15,7 @@ namespace subtickinputs::fields {
 class $modify(SIPlayerObject, PlayerObject) {
 	struct Fields {
 		double m_yDispAdjustment = 0.0;
+		double m_yVelAdjustment = 0.0;
 		std::vector<subtickinputs::fields::PendingWaveInput> m_pendingWaveInputs;
 		bool m_didWaveSplit = false;
 		float m_rotationDelta = 0.0f;

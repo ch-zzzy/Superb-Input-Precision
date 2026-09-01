@@ -68,7 +68,7 @@ void SIPlayerObject::update(float dt) {
 }
 
 void SIPlayerObject::updateRotation(float dt) {
-	auto& didWaveSplit = GET_PLAYER_FIELD(this, m_didWaveSplit);
+	bool& didWaveSplit = GET_PLAYER_FIELD(this, m_didWaveSplit);
 
 	if (!didWaveSplit) {
 		PlayerObject::updateRotation(dt);

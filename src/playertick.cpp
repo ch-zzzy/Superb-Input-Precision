@@ -1,10 +1,10 @@
 // NOLINTBEGIN
-#include "SubtickInputs.hpp"
 #include <algorithm>
 #include <cmath>
 #include <string>
 
 #include "SIPlayerObject.hpp"
+#include "SubtickInputs.hpp"
 
 using namespace subtickinputs;
 using namespace subtickinputs::fields;
@@ -74,13 +74,14 @@ void SIPlayerObject::processPlayerTick(float dt) {
 				if (m_isShip) {
 					modeForceScale = 0.5875f;
 				} else if (m_isBird) {
-					modeForceScale = 0.725f;
+					modeForceScale = 0.72499996f;
 				} else if (m_isSwing) {
 					modeForceScale = 0.61538464f;
 				}
 			}
 
-			auto stateForceYDelta = static_cast<double>(dt * m_stateForceVector.y * modeForceScale);
+			auto stateForceYDelta =
+				static_cast<double>(dtModified * m_stateForceVector.y * modeForceScale);
 			addToYVelocity(stateForceYDelta, 0);
 
 			if (stateForceYDelta != 0) {
@@ -91,20 +92,20 @@ void SIPlayerObject::processPlayerTick(float dt) {
 				(m_isUpsideDown && stateForceYDelta < 0);
 
 			if (shouldAffectAcceleration) {
-				m_accelerationOrSpeed = (stateForceYDelta / 12.94) * 1.5 + m_accelerationOrSpeed;
+				m_accelerationOrSpeed = (stateForceYDelta / 12.94f) * 1.5 + m_accelerationOrSpeed;
 			}
 
 			if (m_isPlatformer) {
 				auto stateForceX = m_stateForceVector.x;
 				m_platformerXVelocity =
-					static_cast<double>(modeForceScale * dtModified) + m_platformerXVelocity;
+					static_cast<double>(stateForceX * dtModified) + m_platformerXVelocity;
 
-				if (modeForceScale != 0) {
+				if (stateForceX != 0) {
 					m_affectedByForces = true;
 				}
 
 				bool canAutoRotate =
-					isInNormalMode() && !m_isRotating && std::abs(modeForceScale) > 0.1;
+					isInNormalMode() && !m_isRotating && std::abs(stateForceX) > 0.1;
 
 				if (canAutoRotate) {
 					runNormalRotation(true, 1);
@@ -114,7 +115,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 
 		bool isDashing = m_isDashing;
 		if (isDashing) {
-			setYVelocity(0, 0);
+			m_yVelocity = 0.0;
 		}
 
 		double scaledDt = dtModified;
@@ -158,7 +159,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 
 		if (logDebug) {
 			log::debug("vanilla ypos displacement (double): {}", yOffset);
-			log::debug("true vanilla ypos displacement (float):  {}", static_cast<float>(yOffset));
+			log::debug("true vanilla ypos displacement (float): {}", static_cast<float>(yOffset));
 			log::debug("m_yDispAdjustment: {}", yDispAdjustment);
 		}
 
