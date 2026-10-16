@@ -3,10 +3,15 @@
 **Please keep in mind that Superb Input Precision is STILL in beta and bugs should be expected,
 not excluding physics-breaking bugs.**
 
+## v1.0.0-beta.7
+
+- port to 2.209, luckily nothing important changed (no velocity unrounding for a bit, likely not until post 2.2091)
+- pls lmk if you're experiencing any bugs that didn't exist before
+
 ## v1.0.0-beta.6
 
 - added a yvel adjustment
-- fixed a force block issue with PlayerObject::update rewrite and some other oversights
+- fixed a force block issue and some other oversights with PlayerObject::update rewrite
 
 ## v1.0.0-beta.5
 

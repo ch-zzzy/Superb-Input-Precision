@@ -1,4 +1,4 @@
-# Superb Input Precision (no updates until like gd 2.209)
+# Superb Input Precision
 
 ## What does it do?
 

@@ -47,6 +47,7 @@ $on_mod(Loaded) {
 
 	// might remove this someday for compatiblity and just check if velocity unrounding mod is enabled
 	settingInit(config::velocityUnroundingEnabled, "velocity-unrounding", [](bool val) {
+		val = false; // force disabled until like 2.2091
 		config::velocityUnroundingEnabled = val;
 		toggleVelocityUnroundingPatches(val);
 	});
