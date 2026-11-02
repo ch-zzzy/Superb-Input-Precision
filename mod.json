@@ -1,10 +1,10 @@
 {
-	"geode": "5.11.2",
+	"geode": "6.0.0-alpha.1",
 	"gd": {
-		"win": "2.209",
-		"mac": "2.209",
-		"android": "2.209",
-		"ios": "2.209"
+		"win": "2.2091",
+		"mac": "2.2091",
+		"android": "2.2091",
+		"ios": "2.2091"
 	},
 	"id": "chizz.superb-input-precision",
 	"name": "Superb Input Precision",
@@ -65,7 +65,7 @@
 			]
 		},
 		"velocity-unrounding": {
-			"name": "Velocity Unrounding (DISABLED FOR NOW)",
+			"name": "Velocity Unrounding",
 			"description": "Implementation of the Velocity Unrounding mod, which prevents the game from rounding y-velocity to 3 decimal places.",
 			"type": "bool",
 			"default": false,

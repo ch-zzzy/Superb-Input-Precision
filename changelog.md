@@ -5,7 +5,10 @@ not excluding physics-breaking bugs.**
 
 ## v1.0.0-beta.7
 
-- port to 2.209, luckily nothing important changed (no velocity unrounding for a bit, likely not until post 2.2091)
+- port to 2.2091, luckily nothing important changed
+- fixed velocity unrounding not enabling patches on startup when necessary
+-
+
 - pls lmk if you're experiencing any bugs that didn't exist before
 
 ## v1.0.0-beta.6

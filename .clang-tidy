@@ -1,0 +1,20 @@
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  misc-include-cleaner,
+  misc-unused-using-decls,
+  -bugprone-derived-method-shadowing-base-method,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -performance-no-int-to-ptr
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '.*[/\\]Superb Input Precision[/\\](src|include)[/\\].*'
+
+FormatStyle: file
+
+CheckOptions:
+  misc-include-cleaner.IgnoreHeaders: 'Geode[/\\].*;cocos2d[/\\].*;cocos-ext[/\\].*'

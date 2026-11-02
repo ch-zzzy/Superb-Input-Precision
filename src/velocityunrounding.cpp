@@ -12,11 +12,12 @@ void subtickinputs::toggleVelocityUnroundingPatches(bool enable) {
 		s_velocityUnroundingNops.init({
 
 			#ifdef GEODE_IS_WINDOWS
-			{0x38C329, 0x24, 0x90}, // updateJump yvel rounding
-			{0x213EA2, 0x32, 0x90}, // checkCollisions yvel rounding
-			{0x38DAC7, 0x38, 0x90}, // postCollision yvel rounding
-			{0x39323B, 0x40, 0x90}, // collidedWithObjectInternal yvel rounding
-			{0x39FF18, 0x32, 0x90}, // boostPlayer yvel rounding
+			{0x4EA5BC, 0x24, 0x90}, // updateJump
+			{0x31B1CE, 0x32, 0x90}, // checkCollisions
+			{0x4EBDF8, 0x38, 0x90}, // postCollision
+			{0x4F146A, 0x3F, 0x90}, // collidedWithObjectInternal
+			{0x4FE334, 0x26, 0x90}, // boostPlayer
+			{0x501726, 0x32, 0x90}, // loadFromCheckpoint
 			#endif
 
 		});

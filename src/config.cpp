@@ -39,23 +39,22 @@ $on_mod(Loaded) {
 
 	settingInit(config::inputHz, "input-hz", [](float val) { config::inputHz = val; });
 
-	settingInit(config::instantInputsEnabled, "instant-inputs",
-		[](bool val) { config::instantInputsEnabled = val; });
+	settingInit(config::instantInputsEnabled, "instant-inputs", [](bool val) { config::instantInputsEnabled = val; });
 
-	settingInit(
-		config::debugModeEnabled, "debug-mode", [](bool val) { config::debugModeEnabled = val; });
+	settingInit(config::debugModeEnabled, "debug-mode", [](bool val) { config::debugModeEnabled = val; });
 
 	// might remove this someday for compatiblity and just check if velocity unrounding mod is enabled
 	settingInit(config::velocityUnroundingEnabled, "velocity-unrounding", [](bool val) {
-		val = false; // force disabled until like 2.2091
 		config::velocityUnroundingEnabled = val;
 		toggleVelocityUnroundingPatches(val);
 	});
+	// ensure patches are applied on mod load
+	toggleVelocityUnroundingPatches(config::velocityUnroundingEnabled);
 }
 
 class $modify(PlayLayer) {
-	bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
-		if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
+	bool init(GJGameLevel* level, bool dontCreateObjects) {
+		if (!PlayLayer::init(level, dontCreateObjects)) return false;
 
 		if (config::modEnabled) {
 			this->m_clickBetweenSteps = false;

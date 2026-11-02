@@ -66,8 +66,8 @@ static double vanillaRoundValue(double value) {
 static float getRawDeltaVel(PlayerObject* player, float scaledDt) {
 	if (player->m_isDart) return 0.0f;
 
-	if (player->m_isRobot && player->m_maybeIsBoosted && player->m_jumpBuffered &&
-		!player->m_touchedPad && player->m_accelerationOrSpeed < 1.5f) {
+	if (player->m_isRobot && player->m_maybeIsBoosted && player->m_jumpBuffered && !player->m_touchedPad &&
+		player->m_accelerationOrSpeed < 1.5f) {
 		return 0.0f;
 	}
 
@@ -75,8 +75,7 @@ static float getRawDeltaVel(PlayerObject* player, float scaledDt) {
 	bool fallingBugged = player->playerIsFallingBugged();
 	bool isMini = player->m_vehicleSize != 1.0f;
 
-	float rawBaseGravity =
-		player->isInBasicMode() ? static_cast<float>(player->m_gravity) : 0.958199f;
+	float rawBaseGravity = player->isInBasicMode() ? static_cast<float>(player->m_gravity) : 0.958199f;
 	float baseGravity = rawBaseGravity * player->m_gravityMod;
 	float sizeFactor = isMini ? (player->isFlying() ? 0.85f : 0.8f) : 1.0f;
 
@@ -214,8 +213,7 @@ static void processInputs(float dt) {
 		s_updateJumpCalledP1 = false;
 		s_updateJumpCalledP2 = false;
 
-		playLayer->handleButton(
-			input.m_isPush, static_cast<int>(input.m_button), !input.m_isPlayer2);
+		playLayer->handleButton(input.m_isPush, static_cast<int>(input.m_button), !input.m_isPlayer2);
 
 		if (p1) {
 			// vanilla explicitly does updateJump(0) but only for certain gamemodes
@@ -237,8 +235,8 @@ static void processInputs(float dt) {
 					"p1 preVel: {}, postVel: {}, preDv: {}, postDv: {}, "
 					"dt: {}, scaledDt: {}, rawRatio: {}, ratio: {}, inputChecksPerTick: {}, "
 					"adjustedYVel: {}, finalVel: {}",
-					preVel1, postVel, preDv1, postDv, dt, scaledDt, rawRatio, ratio,
-					inputChecksPerTick, adjustedYVel1, finalVel1);
+					preVel1, postVel, preDv1, postDv, dt, scaledDt, rawRatio, ratio, inputChecksPerTick, adjustedYVel1,
+					finalVel1);
 			}
 		}
 
@@ -260,8 +258,8 @@ static void processInputs(float dt) {
 					"p2 preVel: {}, postVel: {}, preDv: {}, postDv: {}, dt: {}, scaledDt: {}, "
 					"rawRatio: {}, ratio: {}, inputChecksPerTick: {}, "
 					"adjustedYVel: {}, finalVel: {}",
-					preVel2, postVel, preDv2, postDv, dt, scaledDt, rawRatio, ratio,
-					inputChecksPerTick, adjustedYVel2, finalVel2);
+					preVel2, postVel, preDv2, postDv, dt, scaledDt, rawRatio, ratio, inputChecksPerTick, adjustedYVel2,
+					finalVel2);
 			}
 		}
 
@@ -285,8 +283,7 @@ static void processInputs(float dt) {
 		}
 
 		finalVel -= getRawDeltaVel(player, scaledDt * (1.0 - lastRatio));
-		double predictedVanillaVel =
-			vanillaRoundValue(player->m_yVelocity - getRawDeltaVel(player, scaledDt));
+		double predictedVanillaVel = vanillaRoundValue(player->m_yVelocity - getRawDeltaVel(player, scaledDt));
 
 		double& yVelAdjustment = GET_PLAYER_FIELD(player, m_yVelAdjustment);
 		yVelAdjustment = vanillaRoundValue(finalVel) - predictedVanillaVel;
@@ -336,8 +333,7 @@ namespace subtickinputs {
 		return Ok(std::move(result));
 	}
 
-	Result<void> setInputQueueWithRatios(
-		std::vector<PlayerButtonCommandWithRatio> inputQueue, float dt) {
+	Result<void> setInputQueueWithRatios(std::vector<PlayerButtonCommandWithRatio> inputQueue, float dt) {
 		auto* playLayer = PlayLayer::get();
 		if (!playLayer) return Err("playlayer is null");
 

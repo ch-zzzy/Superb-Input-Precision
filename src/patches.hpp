@@ -1,11 +1,12 @@
 #pragma once
 
-#include "SubtickInputs.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <tuple>
 #include <vector>
+
+#include "SubtickInputs.hpp"
 
 struct PatchGroup {
 	std::vector<Patch*> appliedPatches;
@@ -14,8 +15,7 @@ struct PatchGroup {
 		for (auto& [offset, size, newValue] : entries) {
 			ByteVector potentialPatch(size, newValue);
 
-			auto result =
-				Mod::get()->patch(reinterpret_cast<void*>(base::get() + offset), potentialPatch);
+			auto result = Mod::get()->patch(reinterpret_cast<void*>(base::get() + offset), potentialPatch);
 
 			if (result.isOk()) {
 				auto* patch = result.unwrap();
@@ -23,8 +23,7 @@ struct PatchGroup {
 				(void) patch->disable();
 				appliedPatches.push_back(patch);
 			} else {
-				log::error(
-					"Failed to create patch at offset 0x{:X}: {}", offset, result.unwrapErr());
+				log::error("Failed to create patch at offset 0x{:X}: {}", offset, result.unwrapErr());
 			}
 		}
 	}

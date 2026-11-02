@@ -22,10 +22,8 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		if (elapsed < duration) {
 			float t = elapsed / duration;
 
-			auto mainColor =
-				GameToolbox::multipliedColorValue(m_flashMainColor, m_originalMainColor, t);
-			auto secondColor =
-				GameToolbox::multipliedColorValue(m_flashSecondColor, m_originalSecondColor, t);
+			auto mainColor = GameToolbox::multipliedColorValue(m_flashMainColor, m_originalMainColor, t);
+			auto secondColor = GameToolbox::multipliedColorValue(m_flashSecondColor, m_originalSecondColor, t);
 
 			setColor(mainColor);
 			setSecondColor(secondColor);
@@ -80,16 +78,15 @@ void SIPlayerObject::processPlayerTick(float dt) {
 				}
 			}
 
-			auto stateForceYDelta =
-				static_cast<double>(dtModified * m_stateForceVector.y * modeForceScale);
+			auto stateForceYDelta = static_cast<double>(dtModified * m_stateForceVector.y * modeForceScale);
 			addToYVelocity(stateForceYDelta, 0);
 
 			if (stateForceYDelta != 0) {
 				m_isAccelerating = true;
 			}
 
-			bool shouldAffectAcceleration = (!m_isUpsideDown && stateForceYDelta > 0) ||
-				(m_isUpsideDown && stateForceYDelta < 0);
+			bool shouldAffectAcceleration =
+				(!m_isUpsideDown && stateForceYDelta > 0) || (m_isUpsideDown && stateForceYDelta < 0);
 
 			if (shouldAffectAcceleration) {
 				m_accelerationOrSpeed = (stateForceYDelta / 12.94f) * 1.5 + m_accelerationOrSpeed;
@@ -97,15 +94,13 @@ void SIPlayerObject::processPlayerTick(float dt) {
 
 			if (m_isPlatformer) {
 				auto stateForceX = m_stateForceVector.x;
-				m_platformerXVelocity =
-					static_cast<double>(stateForceX * dtModified) + m_platformerXVelocity;
+				m_platformerXVelocity = static_cast<double>(stateForceX * dtModified) + m_platformerXVelocity;
 
 				if (stateForceX != 0) {
 					m_affectedByForces = true;
 				}
 
-				bool canAutoRotate =
-					isInNormalMode() && !m_isRotating && std::abs(stateForceX) > 0.1;
+				bool canAutoRotate = isInNormalMode() && !m_isRotating && std::abs(stateForceX) > 0.1;
 
 				if (canAutoRotate) {
 					runNormalRotation(true, 1);
@@ -226,8 +221,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 			if (m_hasGroundParticles) {
 				auto action = getActionByTag(3);
 				if (!action) {
-					auto call = CCCallFunc::create(
-						this, callfunc_selector(PlayerObject::deactivateParticle));
+					auto call = CCCallFunc::create(this, callfunc_selector(PlayerObject::deactivateParticle));
 					auto delay = CCDelayTime::create(0.06);
 					action = CCSequence::create(delay, call, nullptr);
 					runAction(action);
@@ -243,11 +237,10 @@ void SIPlayerObject::processPlayerTick(float dt) {
 	}
 
 	bool active = !m_isLocked && !m_isHidden;
-	bool moving = !m_isPlatformer || m_holdingLeft || m_holdingRight || m_platformerMovingLeft ||
-		m_platformerMovingRight;
+	bool moving =
+		!m_isPlatformer || m_holdingLeft || m_holdingRight || m_platformerMovingLeft || m_platformerMovingRight;
 
-	if (!m_isDart && (isFlying()) && m_isOnGround2 && m_yVelocity * flipMod() > -1 && active &&
-		moving) {
+	if (!m_isDart && (isFlying()) && m_isOnGround2 && m_yVelocity * flipMod() > -1 && active && moving) {
 		m_vehicleGroundParticles->resumeSystem();
 	} else {
 		m_vehicleGroundParticles->stopSystem();
@@ -258,12 +251,12 @@ void SIPlayerObject::processPlayerTick(float dt) {
 	if (m_playEffects) {
 		if (!m_isGoingLeft) {
 			auto gameManager = GameManager::get();
-			m_waveTrail->clearBehindXPos(gameManager->m_playLayer->m_gameState.m_cameraPosition2.x);
+			m_waveTrail->clearBehindXPos(gameManager->m_playLayer->m_gameState.m_cameraLastPosition.x);
 		} else {
 			auto winSize = CCDirector::get()->getWinSize();
 			auto gameManager = GameManager::get();
 
-			float cameraX = gameManager->m_playLayer->m_gameState.m_cameraPosition2.x;
+			float cameraX = gameManager->m_playLayer->m_gameState.m_cameraLastPosition.x;
 			float cameraZoom = gameManager->m_playLayer->m_gameState.m_cameraZoom;
 			float thresholdX = cameraX + (winSize.width / cameraZoom);
 
