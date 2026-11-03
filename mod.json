@@ -2,9 +2,7 @@
 	"geode": "6.0.0-alpha.1",
 	"gd": {
 		"win": "2.2091",
-		"mac": "2.2091",
-		"android": "2.2091",
-		"ios": "2.2091"
+		"android": "2.2091"
 	},
 	"id": "chizz.superb-input-precision",
 	"name": "Superb Input Precision",
@@ -80,6 +78,7 @@
 		"syzzi.click_between_frames": ">=v1.0.0",
 		"zmx.cbf-lite": ">=v1.0.0",
 		"alphalaneous.click_after_frames": ">=v1.0.0",
+		"erymanthus.click_after_frames": ">=v1.0.0",
 		"chizz.velocity-unrounding": "<=v1.0.7"
 	},
 	"api": {

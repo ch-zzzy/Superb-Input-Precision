@@ -14,6 +14,7 @@ namespace subtickinputs::fields {
 
 class $modify(SIPlayerObject, PlayerObject) {
 	struct Fields {
+		bool m_updateJumpCalled = false;
 		double m_yDispAdjustment = 0.0;
 		double m_yVelAdjustment = 0.0;
 		std::vector<subtickinputs::fields::PendingWaveInput> m_pendingWaveInputs;

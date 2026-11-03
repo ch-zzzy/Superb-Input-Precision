@@ -6,9 +6,8 @@ not excluding physics-breaking bugs.**
 ## v1.0.0-beta.7
 
 - port to 2.2091, luckily nothing important changed
-- fixed velocity unrounding not enabling patches on startup when necessary
--
-
+- no mac or ios support until some geode bindings stuff are fixed
+- fixed velocity unrounding not enabling patches on startup when the setting was already enabled
 - pls lmk if you're experiencing any bugs that didn't exist before
 
 ## v1.0.0-beta.6

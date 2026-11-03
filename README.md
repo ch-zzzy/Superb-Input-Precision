@@ -47,7 +47,9 @@ The result is sub-tick input precision that aims to stay faithful to vanilla phy
 
 ## Credits
 
-- Thanks to syzzi for the original CBF idea, this was obviously heavily inspired by it. [CBF Github](https://github.com/theyareonit/Click-Between-Frames)
+- Thanks to syzzi for the original CBF idea, this was obviously heavily inspired by it. [CBF GitHub](https://github.com/theyareonit/Click-Between-Frames)
+
+- Thanks to alex/sinc0s for logo inspo and permission
 
 ## Bugs
 

@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <utility>
+#include <vector>
 
 #include "../include/InputQueue.hpp"
 #include "SIPlayerObject.hpp"
@@ -14,9 +16,6 @@ using namespace subtickinputs;
 using namespace subtickinputs::fields;
 
 static bool s_isLastTickOfFrame = true;
-
-static bool s_updateJumpCalledP1 = false;
-static bool s_updateJumpCalledP2 = false;
 
 static void processInputs(float dt);
 
@@ -42,13 +41,7 @@ class $modify(GJBaseGameLayer) {
 
 class $modify(PlayerObject) {
 	void updateJump(float dt) {
-		auto* playLayer = PlayLayer::get();
-		if (playLayer) {
-			if (this == playLayer->m_player1)
-				s_updateJumpCalledP1 = true;
-			else if (this == playLayer->m_player2)
-				s_updateJumpCalledP2 = true;
-		}
+		GET_PLAYER_FIELD(static_cast<PlayerObject*>(this), m_updateJumpCalled) = true;
 		PlayerObject::updateJump(dt);
 	}
 };
@@ -119,6 +112,89 @@ static double getDeltaVel(PlayerObject* player, float scaledDt) {
 	return vanillaRoundValue(player->m_yVelocity - dV) - player->m_yVelocity;
 }
 
+namespace {
+	// everything processInputs tracks for one player over one tick
+	struct PlayerTickState {
+		PlayerObject* m_player;
+
+		double m_adjustedYVel = 0.0;
+		double m_finalVel = 0.0;
+		double m_lastRatio = 0.0;
+
+		// captured right before each input
+		double m_preVel = 0.0;
+		double m_preDv = 0.0;
+
+		explicit PlayerTickState(PlayerObject* player) : m_player(player) {
+			if (!m_player) return;
+
+			// apply the velocity carried over from last tick before anything reads it
+			double& yVelAdjustment = GET_PLAYER_FIELD(m_player, m_yVelAdjustment);
+			m_player->m_yVelocity += yVelAdjustment;
+			yVelAdjustment = 0.0;
+
+			m_finalVel = m_player->m_yVelocity;
+		}
+
+		void advanceToInput(double ratio, float scaledDt) {
+			m_preVel = m_player->m_yVelocity;
+			m_preDv = getDeltaVel(m_player, scaledDt);
+
+			m_finalVel -= getRawDeltaVel(m_player, scaledDt * (ratio - m_lastRatio));
+			m_lastRatio = ratio;
+		}
+
+		void applyInputResult(double ratio, double rawRatio, float dt, float scaledDt, double inputSamplesPerTick) {
+			// vanilla explicitly does updateJump(0) but only for certain gamemodes
+			// the checks avoid double calling for those gamemodes
+			if (!GET_PLAYER_FIELD(m_player, m_updateJumpCalled)) m_player->updateJump(0.0f);
+
+			double postVel = m_player->m_yVelocity;
+			double postDv = getDeltaVel(m_player, scaledDt);
+
+			double preInputVel = m_preVel + m_preDv;
+			double postInputVel = postVel + postDv;
+
+			m_adjustedYVel += ratio * (preInputVel - postInputVel);
+
+			if (postVel != m_preVel) m_finalVel = postVel;
+
+			if (config::debugModeEnabled) {
+				int playerNumber = m_player == PlayLayer::get()->m_player1 ? 1 : 2;
+				log::debug(
+					"p{} preVel: {}, postVel: {}, preDv: {}, postDv: {}, "
+					"dt: {}, scaledDt: {}, rawRatio: {}, ratio: {}, inputSamplesPerTick: {}, "
+					"adjustedYVel: {}, finalVel: {}",
+					playerNumber, m_preVel, postVel, m_preDv, postDv, dt, scaledDt, rawRatio, ratio, inputSamplesPerTick,
+					m_adjustedYVel, m_finalVel);
+			}
+		}
+
+		void computeAdjustments(float scaledDt, double tps) {
+			if (m_player->m_isDart) {
+				// probably redundant since it's only dash orbs that can reach here
+				double waveDt = 60.0 / tps * ((m_player->m_vehicleSize != 1.0f) ? 2.0 : 1.0);
+				GET_PLAYER_FIELD(m_player, m_yDispAdjustment) = m_adjustedYVel * waveDt;
+			} else {
+				GET_PLAYER_FIELD(m_player, m_yDispAdjustment) = m_adjustedYVel * scaledDt;
+			}
+
+			m_finalVel -= getRawDeltaVel(m_player, scaledDt * (1.0 - m_lastRatio));
+			double predictedVanillaVel = vanillaRoundValue(m_player->m_yVelocity - getRawDeltaVel(m_player, scaledDt));
+
+			double& yVelAdjustment = GET_PLAYER_FIELD(m_player, m_yVelAdjustment);
+			yVelAdjustment = vanillaRoundValue(m_finalVel) - predictedVanillaVel;
+
+			bool logDebug = config::debugModeEnabled && yVelAdjustment != 0.0;
+			if (logDebug) {
+				log::debug("predicted vanilla velocity: {}", predictedVanillaVel);
+				log::debug("subtick velocity: {}", vanillaRoundValue(m_finalVel));
+				log::debug("m_yVelAdjustment: {}", yVelAdjustment);
+			}
+		}
+	};
+} // namespace
+
 static void processInputs(float dt) {
 	auto* playLayer = PlayLayer::get();
 	if (!playLayer) return;
@@ -128,7 +204,7 @@ static void processInputs(float dt) {
 	auto& inputQueue = playLayer->m_queuedButtons;
 
 	double tps = 1.0 / dt;
-	double inputChecksPerTick = config::inputHz / tps;
+	double inputSamplesPerTick = config::inputHz / tps;
 	float scaledDt = 60.0f * dt * 0.9f;
 
 	PlayerObject* p1 = playLayer->m_player1;
@@ -140,20 +216,7 @@ static void processInputs(float dt) {
 		p2 = nullptr;
 	}
 
-	for (PlayerObject* player : {p1, p2}) {
-		if (!player) continue;
-		double& yVelAdjustment = GET_PLAYER_FIELD(player, m_yVelAdjustment);
-		player->m_yVelocity += yVelAdjustment;
-		yVelAdjustment = 0.0;
-	}
-
-	double adjustedYVel1 = 0.0;
-	double adjustedYVel2 = 0.0;
-
-	double finalVel1 = p1 ? p1->m_yVelocity : 0.0;
-	double finalVel2 = p2 ? p2->m_yVelocity : 0.0;
-	double lastRatio1 = 0.0;
-	double lastRatio2 = 0.0;
+	PlayerTickState playerStates[2] = {PlayerTickState(p1), PlayerTickState(p2)};
 
 	double tickDuration = dt;
 	double tickStartTime = playLayer->m_timestamp;
@@ -177,8 +240,8 @@ static void processInputs(float dt) {
 		double ratio = std::clamp(rawRatio, 0.0, 1.0);
 
 		if (!config::instantInputsEnabled) {
-			if (inputChecksPerTick > 1.0) {
-				ratio = std::floor(ratio * inputChecksPerTick) / inputChecksPerTick;
+			if (inputSamplesPerTick > 1.0) {
+				ratio = std::floor(ratio * inputSamplesPerTick) / inputSamplesPerTick;
 			} else {
 				ratio = 0.0;
 			}
@@ -191,109 +254,29 @@ static void processInputs(float dt) {
 					input.m_isPush,
 					static_cast<int>(input.m_button),
 				});
-			// this is processed in PlayerObject::update in hooks.cpp
+			// this is processed in PlayerObject::update in wavetick.cpp
 			continue;
 		}
 
-		double preVel1 = p1 ? p1->m_yVelocity : 0.0;
-		double preDv1 = p1 ? getDeltaVel(p1, scaledDt) : 0.0;
-
-		double preVel2 = p2 ? p2->m_yVelocity : 0.0;
-		double preDv2 = p2 ? getDeltaVel(p2, scaledDt) : 0.0;
-
-		if (p1) {
-			finalVel1 -= getRawDeltaVel(p1, scaledDt * (ratio - lastRatio1));
-			lastRatio1 = ratio;
+		for (auto& state : playerStates) {
+			if (state.m_player) {
+				state.advanceToInput(ratio, scaledDt);
+				GET_PLAYER_FIELD(state.m_player, m_updateJumpCalled) = false;
+			}
 		}
-		if (p2) {
-			finalVel2 -= getRawDeltaVel(p2, scaledDt * (ratio - lastRatio2));
-			lastRatio2 = ratio;
-		}
-
-		s_updateJumpCalledP1 = false;
-		s_updateJumpCalledP2 = false;
 
 		playLayer->handleButton(input.m_isPush, static_cast<int>(input.m_button), !input.m_isPlayer2);
 
-		if (p1) {
-			// vanilla explicitly does updateJump(0) but only for certain gamemodes
-			// the checks avoid double calling for those gamemodes
-			if (!s_updateJumpCalledP1) p1->updateJump(0.0f);
-
-			double postVel = p1->m_yVelocity;
-			double postDv = getDeltaVel(p1, scaledDt);
-
-			double preInputVel = preVel1 + preDv1;
-			double postInputVel = postVel + postDv;
-
-			adjustedYVel1 += ratio * (preInputVel - postInputVel);
-
-			if (postVel != preVel1) finalVel1 = postVel;
-
-			if (config::debugModeEnabled) {
-				log::debug(
-					"p1 preVel: {}, postVel: {}, preDv: {}, postDv: {}, "
-					"dt: {}, scaledDt: {}, rawRatio: {}, ratio: {}, inputChecksPerTick: {}, "
-					"adjustedYVel: {}, finalVel: {}",
-					preVel1, postVel, preDv1, postDv, dt, scaledDt, rawRatio, ratio, inputChecksPerTick, adjustedYVel1,
-					finalVel1);
-			}
-		}
-
-		if (p2) {
-			if (!s_updateJumpCalledP2) p2->updateJump(0.0f);
-
-			double postVel = p2->m_yVelocity;
-			double postDv = getDeltaVel(p2, scaledDt);
-
-			double preInputVel = preVel2 + preDv2;
-			double postInputVel = postVel + postDv;
-
-			adjustedYVel2 += ratio * (preInputVel - postInputVel);
-
-			if (postVel != preVel2) finalVel2 = postVel;
-
-			if (config::debugModeEnabled) {
-				log::debug(
-					"p2 preVel: {}, postVel: {}, preDv: {}, postDv: {}, dt: {}, scaledDt: {}, "
-					"rawRatio: {}, ratio: {}, inputChecksPerTick: {}, "
-					"adjustedYVel: {}, finalVel: {}",
-					preVel2, postVel, preDv2, postDv, dt, scaledDt, rawRatio, ratio, inputChecksPerTick, adjustedYVel2,
-					finalVel2);
-			}
+		for (auto& state : playerStates) {
+			if (state.m_player) state.applyInputResult(ratio, rawRatio, dt, scaledDt, inputSamplesPerTick);
 		}
 
 		// the handleButton + updateJump method to "dispatch" an input could be wrong
 		// i'll let the players figure that one out 😛
 	}
 
-	for (PlayerObject* player : {p1, p2}) {
-		if (!player) continue;
-
-		double adjustedYVel = (player == p1) ? adjustedYVel1 : adjustedYVel2;
-		double& finalVel = (player == p1) ? finalVel1 : finalVel2;
-		double lastRatio = (player == p1) ? lastRatio1 : lastRatio2;
-
-		if (player->m_isDart) {
-			// probably redundant since it's only dash orbs that can reach here
-			double waveDt = 60.0 / tps * ((player->m_vehicleSize != 1.0f) ? 2.0 : 1.0);
-			GET_PLAYER_FIELD(player, m_yDispAdjustment) = adjustedYVel * waveDt;
-		} else {
-			GET_PLAYER_FIELD(player, m_yDispAdjustment) = adjustedYVel * scaledDt;
-		}
-
-		finalVel -= getRawDeltaVel(player, scaledDt * (1.0 - lastRatio));
-		double predictedVanillaVel = vanillaRoundValue(player->m_yVelocity - getRawDeltaVel(player, scaledDt));
-
-		double& yVelAdjustment = GET_PLAYER_FIELD(player, m_yVelAdjustment);
-		yVelAdjustment = vanillaRoundValue(finalVel) - predictedVanillaVel;
-
-		bool logDebug = config::debugModeEnabled && yVelAdjustment != 0.0;
-		if (logDebug) {
-			log::debug("predicted vanilla velocity: {}", predictedVanillaVel);
-			log::debug("subtick velocity: {}", vanillaRoundValue(finalVel));
-			log::debug("m_yVelAdjustment: {}", yVelAdjustment);
-		}
+	for (auto& state : playerStates) {
+		if (state.m_player) state.computeAdjustments(scaledDt, tps);
 	}
 
 	inputQueue.erase(inputQueue.begin(), inputQueue.begin() + processedCount);
@@ -305,7 +288,7 @@ namespace subtickinputs {
 		if (!playLayer) return Err("playlayer is null");
 
 		double tps = 1.0 / dt;
-		double inputChecksPerTick = config::inputHz / tps;
+		double inputSamplesPerTick = config::inputHz / tps;
 
 		double tickDuration = dt;
 		double tickStartTime = playLayer->m_timestamp;
@@ -320,8 +303,8 @@ namespace subtickinputs {
 			ratio = std::clamp(ratio, 0.0, 1.0);
 
 			if (!config::instantInputsEnabled) {
-				if (inputChecksPerTick > 1.0) {
-					ratio = std::floor(ratio * inputChecksPerTick) / inputChecksPerTick;
+				if (inputSamplesPerTick > 1.0) {
+					ratio = std::floor(ratio * inputSamplesPerTick) / inputSamplesPerTick;
 				} else {
 					ratio = 0.0;
 				}
