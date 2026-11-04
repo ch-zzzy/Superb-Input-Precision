@@ -15,6 +15,8 @@ namespace subtickinputs {
 		inline bool velocityUnroundingEnabled = false;
 		inline bool modEnabled = false;
 		inline bool debugModeEnabled = false;
+
+		void applyClickSettings(PlayLayer* playLayer);
 	} // namespace config
 
 } // namespace subtickinputs

@@ -1,6 +1,7 @@
 #define GEODE_DEFINE_EVENT_EXPORTS
 
 #include <Geode/modify/GJBaseGameLayer.hpp>
+#include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
 #include <algorithm>
 #include <cmath>
@@ -36,6 +37,32 @@ class $modify(GJBaseGameLayer) {
 	void processCommands(float dt, bool isHalfTick, bool isLastTick) {
 		s_isLastTickOfFrame = isLastTick;
 		GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
+	}
+};
+
+class $modify(PlayLayer) {
+	bool init(GJGameLevel* level, bool dontCreateObjects) {
+		if (!PlayLayer::init(level, dontCreateObjects)) return false;
+
+		if (config::modEnabled) config::applyClickSettings(this);
+		return true;
+	}
+
+	void resetLevel() {
+		PlayLayer::resetLevel();
+
+		if (config::modEnabled) config::applyClickSettings(this);
+
+		for (PlayerObject* player : {this->m_player1, this->m_player2}) {
+			if (!player) continue;
+
+			double& yVelAdjustment = GET_PLAYER_FIELD(player, m_yVelAdjustment);
+			double& yDispAdjustment = GET_PLAYER_FIELD(player, m_yDispAdjustment);
+
+			yVelAdjustment = 0.0;
+			yDispAdjustment = 0.0;
+			GET_PLAYER_FIELD(player, m_pendingWaveInputs).clear();
+		}
 	}
 };
 
