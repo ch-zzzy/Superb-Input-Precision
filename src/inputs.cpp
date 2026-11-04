@@ -165,8 +165,8 @@ namespace {
 					"p{} preVel: {}, postVel: {}, preDv: {}, postDv: {}, "
 					"dt: {}, scaledDt: {}, rawRatio: {}, ratio: {}, inputSamplesPerTick: {}, "
 					"adjustedYVel: {}, finalVel: {}",
-					playerNumber, m_preVel, postVel, m_preDv, postDv, dt, scaledDt, rawRatio, ratio, inputSamplesPerTick,
-					m_adjustedYVel, m_finalVel);
+					playerNumber, m_preVel, postVel, m_preDv, postDv, dt, scaledDt, rawRatio, ratio,
+					inputSamplesPerTick, m_adjustedYVel, m_finalVel);
 			}
 		}
 
@@ -270,9 +270,6 @@ static void processInputs(float dt) {
 		for (auto& state : playerStates) {
 			if (state.m_player) state.applyInputResult(ratio, rawRatio, dt, scaledDt, inputSamplesPerTick);
 		}
-
-		// the handleButton + updateJump method to "dispatch" an input could be wrong
-		// i'll let the players figure that one out 😛
 	}
 
 	for (auto& state : playerStates) {
