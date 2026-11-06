@@ -1,14 +1,15 @@
 # Changelog
 
-**Please keep in mind that Superb Input Precision is STILL in beta and bugs should be expected,
-not excluding physics-breaking bugs.**
-
-## v1.0.0-beta.7
+## v1.0.0
 
 - port to 2.2091, luckily nothing important changed
 - no mac or ios support until some geode bindings stuff are fixed
 - fixed velocity unrounding not enabling patches on startup when the setting was already enabled
+- fixed gd's "phantom" inputs at the start of any attempt breaking stuff for wave
+- getInputQueueWithRatios no longer clamps all inputs to one tick
 - pls lmk if you're experiencing any bugs that didn't exist before
+
+---
 
 ## v1.0.0-beta.6
 

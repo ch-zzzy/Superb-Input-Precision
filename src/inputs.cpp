@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <initializer_list>
 #include <utility>
 #include <vector>
 
@@ -16,27 +17,93 @@
 using namespace subtickinputs;
 using namespace subtickinputs::fields;
 
-static bool s_isLastTickOfFrame = true;
+namespace {
+	// input timestamps are realtime, while m_timestamp only advances by gametime,
+	// which speedhack, timewarp and frame stalls all stretch or shrink
+	struct FrameTiming {
+		double m_realStart = 0.0; // m_timestamp on entry, vanilla sets it to the previous frame's clock read
+		double m_realEnd = 0.0;	  // clock read at the start of this frame
+		int m_tickCount = 1;
+		int m_tickIndex = 0;
+		bool m_isValid = false;
+	};
 
-static void processInputs(float dt);
+	// where one tick is on realtime clock
+	struct TickWindow {
+		double m_start;
+		double m_duration;
+
+		double getRatioFromTimestamp(double timestamp) const {
+			return (timestamp - m_start) / m_duration;
+		}
+
+		double getTimestampFromRatio(double ratio) const {
+			return m_start + ratio * m_duration;
+		}
+	};
+} // namespace
+
+static FrameTiming s_frameTiming;
+
+static TickWindow getCurrentTickWindow(GJBaseGameLayer* gameLayer, float dt) {
+	// outside a running frame there is no real span to use, so fall back to vanilla's gametime window
+	if (!s_frameTiming.m_isValid) {
+		return {gameLayer->m_timestamp, dt};
+	}
+
+	double tickDuration = (s_frameTiming.m_realEnd - s_frameTiming.m_realStart) / s_frameTiming.m_tickCount;
+	double tickStartTime = s_frameTiming.m_realStart + s_frameTiming.m_tickIndex * tickDuration;
+	return {tickStartTime, tickDuration};
+}
+
+static void processInputs(float dt, bool processEntireQueue);
 
 class $modify(GJBaseGameLayer) {
 	static void onModify(auto& self) {
 		(void) self.setHookPriority("GJBaseGameLayer::processQueuedButtons", Priority::Replace);
 	}
 
+	void update(float dt) {
+		s_frameTiming.m_realStart = this->m_timestamp;
+		s_frameTiming.m_realEnd = utils::getInputTimestamp();
+		s_frameTiming.m_tickIndex = 0;
+		// only becomes valid once getModifiedDelta runs, which vanilla skips while paused or not started
+		s_frameTiming.m_isValid = false;
+
+		GJBaseGameLayer::update(dt);
+
+		s_frameTiming.m_isValid = false;
+	}
+
+	double getModifiedDelta(float dt) {
+		double delta = GJBaseGameLayer::getModifiedDelta(dt);
+
+		// same calculations vanilla does
+		float timeWarp = std::min(this->m_gameState.m_timeWarp, 1.0f);
+		float tickCount = std::round(static_cast<float>(delta * 60.0 / timeWarp * 4.0));
+
+		s_frameTiming.m_tickCount = std::max(1, static_cast<int>(tickCount));
+		s_frameTiming.m_isValid = s_frameTiming.m_realEnd > s_frameTiming.m_realStart;
+
+		return delta;
+	}
+
 	// the main thing
 	void processQueuedButtons(float dt, bool clearInputQueue) {
-		if (!useVanilla()) {
-			processInputs(dt);
+		if (useVanilla() || dt <= 0.0f) {
+			GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
+			return;
 		}
 
-		GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
+		// the original isn't called after this, since it
+		// could take inputs sip deferred to a later tick
+		// also clearInputQueue (with COS enabled, as is the case) is true only on the last tick of the frame
+		processInputs(dt, clearInputQueue);
 	}
 
 	void processCommands(float dt, bool isHalfTick, bool isLastTick) {
-		s_isLastTickOfFrame = isLastTick;
 		GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
+		s_frameTiming.m_tickIndex++;
 	}
 };
 
@@ -56,11 +123,8 @@ class $modify(PlayLayer) {
 		for (PlayerObject* player : {this->m_player1, this->m_player2}) {
 			if (!player) continue;
 
-			double& yVelAdjustment = GET_PLAYER_FIELD(player, m_yVelAdjustment);
-			double& yDispAdjustment = GET_PLAYER_FIELD(player, m_yDispAdjustment);
-
-			yVelAdjustment = 0.0;
-			yDispAdjustment = 0.0;
+			GET_PLAYER_FIELD(player, m_yVelAdjustment) = 0.0;
+			GET_PLAYER_FIELD(player, m_yDispAdjustment) = 0.0;
 			GET_PLAYER_FIELD(player, m_pendingWaveInputs).clear();
 		}
 	}
@@ -222,11 +286,9 @@ namespace {
 	};
 } // namespace
 
-static void processInputs(float dt) {
+static void processInputs(float dt, bool processEntireQueue) {
 	auto* playLayer = PlayLayer::get();
 	if (!playLayer) return;
-
-	if (dt <= 0.0f) return;
 
 	auto& inputQueue = playLayer->m_queuedButtons;
 
@@ -245,25 +307,21 @@ static void processInputs(float dt) {
 
 	PlayerTickState playerStates[2] = {PlayerTickState(p1), PlayerTickState(p2)};
 
-	double tickDuration = dt;
-	double tickStartTime = playLayer->m_timestamp;
-	double tickEndTime = tickStartTime + tickDuration;
-
-	bool processEntireQueue = s_isLastTickOfFrame;
+	auto tickWindow = getCurrentTickWindow(playLayer, dt);
 
 	size_t processedCount = 0;
 
 	for (auto& input : inputQueue) {
-		if (!processEntireQueue && input.m_timestamp >= tickEndTime) {
+		double rawRatio = tickWindow.getRatioFromTimestamp(input.m_timestamp);
+
+		// past the end of this tick, so it belongs to a later one
+		if (!processEntireQueue && rawRatio >= 1.0) {
 			break;
 		}
 		processedCount++;
 
 		PlayerObject* player = input.m_isPlayer2 ? p2 : p1;
 
-		double currentTime = input.m_timestamp;
-
-		double rawRatio = (currentTime - tickStartTime) / tickDuration;
 		double ratio = std::clamp(rawRatio, 0.0, 1.0);
 
 		if (!config::instantInputsEnabled) {
@@ -274,7 +332,7 @@ static void processInputs(float dt) {
 			}
 		}
 
-		if (player && player->m_isDart && !player->m_isDashing) {
+		if (player && player->m_isDart && !player->m_isDashing && ratio > 0.0) {
 			GET_PLAYER_FIELD(player, m_pendingWaveInputs)
 				.push_back({
 					ratio,
@@ -314,19 +372,16 @@ namespace subtickinputs {
 		double tps = 1.0 / dt;
 		double inputSamplesPerTick = config::inputHz / tps;
 
-		double tickDuration = dt;
-		double tickStartTime = playLayer->m_timestamp;
-		double tickEndTime = tickStartTime + tickDuration;
+		auto tickWindow = getCurrentTickWindow(playLayer, dt);
 
 		std::vector<PlayerButtonCommandWithRatio> result;
 
 		for (auto& input : playLayer->m_queuedButtons) {
-			double currentTime = input.m_timestamp;
+			double ratio = tickWindow.getRatioFromTimestamp(input.m_timestamp);
 
-			double ratio = (currentTime - tickStartTime) / tickDuration;
-			ratio = std::clamp(ratio, 0.0, 1.0);
-
-			if (!config::instantInputsEnabled) {
+			// only inputs inside this tick get quantized
+			bool isInThisTick = ratio >= 0.0 && ratio < 1.0;
+			if (isInThisTick && !config::instantInputsEnabled) {
 				if (inputSamplesPerTick > 1.0) {
 					ratio = std::floor(ratio * inputSamplesPerTick) / inputSamplesPerTick;
 				} else {
@@ -344,13 +399,16 @@ namespace subtickinputs {
 		auto* playLayer = PlayLayer::get();
 		if (!playLayer) return Err("playlayer is null");
 
+		auto tickWindow = getCurrentTickWindow(playLayer, dt);
+
 		// no way this works 😂
 		playLayer->m_queuedButtons.clear();
 		for (auto& inputWithRatio : inputQueue) {
 			auto& inputWithoutRatio = inputWithRatio.input;
-			inputWithoutRatio.m_timestamp = playLayer->m_timestamp + inputWithRatio.ratio * dt;
+			inputWithoutRatio.m_timestamp = tickWindow.getTimestampFromRatio(inputWithRatio.ratio);
 			playLayer->m_queuedButtons.push_back(inputWithoutRatio);
 		}
+
 		return Ok();
 	}
 } // namespace subtickinputs
