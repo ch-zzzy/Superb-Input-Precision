@@ -18,8 +18,8 @@ using namespace subtickinputs;
 using namespace subtickinputs::fields;
 
 namespace {
-	// input timestamps are realtime, while m_timestamp only advances by gametime,
-	// which speedhack, timewarp and frame stalls all stretch or shrink
+	// input timestamps are realtime, while m_timestamp only advances by gametime
+	// which speedhack, timewarp and the rounding to whole ticks (leftover carried to the next frame) stretch or shrink
 	struct FrameTiming {
 		double m_realStart = 0.0; // m_timestamp on entry, vanilla sets it to the previous frame's clock read
 		double m_realEnd = 0.0;	  // clock read at the start of this frame
@@ -63,6 +63,19 @@ class $modify(GJBaseGameLayer) {
 		(void) self.setHookPriority("GJBaseGameLayer::processQueuedButtons", Priority::Replace);
 	}
 
+	// the main thing
+	void processQueuedButtons(float dt, bool clearInputQueue) {
+		if (useVanilla() || dt <= 0.0f) {
+			GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
+			return;
+		}
+
+		// the original isn't called after this, since it
+		// could take inputs sip deferred to a later tick
+		// also clearInputQueue (with COS enabled, as is the case) is true only on the last tick of the frame
+		processInputs(dt, clearInputQueue);
+	}
+
 	void update(float dt) {
 		s_frameTiming.m_realStart = this->m_timestamp;
 		s_frameTiming.m_realEnd = utils::getInputTimestamp();
@@ -88,19 +101,6 @@ class $modify(GJBaseGameLayer) {
 		return delta;
 	}
 
-	// the main thing
-	void processQueuedButtons(float dt, bool clearInputQueue) {
-		if (useVanilla() || dt <= 0.0f) {
-			GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
-			return;
-		}
-
-		// the original isn't called after this, since it
-		// could take inputs sip deferred to a later tick
-		// also clearInputQueue (with COS enabled, as is the case) is true only on the last tick of the frame
-		processInputs(dt, clearInputQueue);
-	}
-
 	void processCommands(float dt, bool isHalfTick, bool isLastTick) {
 		GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
 		s_frameTiming.m_tickIndex++;
@@ -120,12 +120,15 @@ class $modify(PlayLayer) {
 
 		if (config::modEnabled) config::applyClickSettings(this);
 
+		s_pendingSplitInputs.clear();
+
 		for (PlayerObject* player : {this->m_player1, this->m_player2}) {
 			if (!player) continue;
 
 			GET_PLAYER_FIELD(player, m_yVelAdjustment) = 0.0;
 			GET_PLAYER_FIELD(player, m_yDispAdjustment) = 0.0;
-			GET_PLAYER_FIELD(player, m_pendingWaveInputs).clear();
+			GET_PLAYER_FIELD(player, m_skipNextUpdate) = false;
+			GET_PLAYER_FIELD(player, m_didSplit) = false;
 		}
 	}
 };
@@ -147,10 +150,11 @@ static double vanillaRoundValue(double value) {
 	}
 }
 
+// recreation of the gravity calculations from PlayerObject::updateJump
 static float getRawDeltaVel(PlayerObject* player, float scaledDt) {
 	if (player->m_isDart) return 0.0f;
 
-	if (player->m_isRobot && player->m_maybeIsBoosted && player->m_jumpBuffered && !player->m_touchedPad &&
+	if (player->m_isRobot && player->m_isRising && player->m_jumpBuffered && !player->m_touchedPad &&
 		player->m_accelerationOrSpeed < 1.5f) {
 		return 0.0f;
 	}
@@ -295,19 +299,24 @@ static void processInputs(float dt, bool processEntireQueue) {
 	double tps = 1.0 / dt;
 	double inputSamplesPerTick = config::inputHz / tps;
 	float scaledDt = 60.0f * dt * 0.9f;
+	auto tickWindow = getCurrentTickWindow(playLayer, dt);
 
-	PlayerObject* p1 = playLayer->m_player1;
-	PlayerObject* p2 = playLayer->m_player2;
+	bool isDual = playLayer->m_gameState.m_isDualMode;
+
+	// if at least one player is a wave, every input this tick is split (see split_tick.cpp),
+	// otherwise every input goes through the velocity/displacement adjustments below
+	bool splitThisTick = isSplittableWave(playLayer->m_player1) || (isDual && isSplittableWave(playLayer->m_player2));
+
+	auto* p1 = playLayer->m_player1;
+	auto* p2 = playLayer->m_player2;
 	if (p1 && !p1->isVanillaPlayer()) {
 		p1 = nullptr;
 	}
-	if (p2 && (!playLayer->m_gameState.m_isDualMode || !p2->isVanillaPlayer())) {
+	if (p2 && (!isDual || !p2->isVanillaPlayer())) {
 		p2 = nullptr;
 	}
 
 	PlayerTickState playerStates[2] = {PlayerTickState(p1), PlayerTickState(p2)};
-
-	auto tickWindow = getCurrentTickWindow(playLayer, dt);
 
 	size_t processedCount = 0;
 
@@ -315,12 +324,9 @@ static void processInputs(float dt, bool processEntireQueue) {
 		double rawRatio = tickWindow.getRatioFromTimestamp(input.m_timestamp);
 
 		// past the end of this tick, so it belongs to a later one
-		if (!processEntireQueue && rawRatio >= 1.0) {
-			break;
-		}
-		processedCount++;
+		if (!processEntireQueue && rawRatio >= 1.0) break;
 
-		PlayerObject* player = input.m_isPlayer2 ? p2 : p1;
+		processedCount++;
 
 		double ratio = std::clamp(rawRatio, 0.0, 1.0);
 
@@ -332,14 +338,9 @@ static void processInputs(float dt, bool processEntireQueue) {
 			}
 		}
 
-		if (player && player->m_isDart && !player->m_isDashing && ratio > 0.0) {
-			GET_PLAYER_FIELD(player, m_pendingWaveInputs)
-				.push_back({
-					ratio,
-					input.m_isPush,
-					static_cast<int>(input.m_button),
-				});
-			// this is processed in PlayerObject::update in wavetick.cpp
+		if (splitThisTick && ratio > 0.0) {
+			// this is processed in SIPlayerObject::update in split_tick.cpp
+			s_pendingSplitInputs.push_back({input, ratio});
 			continue;
 		}
 
@@ -364,7 +365,7 @@ static void processInputs(float dt, bool processEntireQueue) {
 	inputQueue.erase(inputQueue.begin(), inputQueue.begin() + processedCount);
 }
 
-namespace subtickinputs {
+namespace subtickinputs::api {
 	Result<std::vector<PlayerButtonCommandWithRatio>> getInputQueueWithRatios(float dt) {
 		auto* playLayer = PlayLayer::get();
 		if (!playLayer) return Err("playlayer is null");
@@ -411,4 +412,4 @@ namespace subtickinputs {
 
 		return Ok();
 	}
-} // namespace subtickinputs
+} // namespace subtickinputs::api

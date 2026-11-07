@@ -8,8 +8,7 @@
 
 #define MY_MOD_ID "chizz.superb-input-precision"
 
-namespace subtickinputs {
-
+namespace subtickinputs::api {
 	struct PlayerButtonCommandWithRatio {
 		PlayerButtonCommand input;
 		double ratio;
@@ -20,4 +19,4 @@ namespace subtickinputs {
 
 	GEODE_EVENT_EXPORT(
 		geode::Result<std::vector<PlayerButtonCommandWithRatio>>, getInputQueueWithRatios, (float dt), (dt));
-} // namespace subtickinputs
+} // namespace subtickinputs::api

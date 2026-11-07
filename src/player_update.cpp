@@ -11,7 +11,9 @@ using namespace subtickinputs::fields;
 
 static std::string getFrameForStreak(ShipStreak type, float time);
 
-// modification at line: 155
+// modified rewrite of PlayerObject::update
+// called on every tick that isn't split or vanilla
+// modification at line: 152
 void SIPlayerObject::processPlayerTick(float dt) {
 	auto dtModified = dt * 0.9f;
 
@@ -48,7 +50,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 	float movedDist = m_lastPosition.getDistance(pos);
 	m_lastPosition = pos;
 
-	m_yVelocityRelated3 = 0.f;
+	m_diagonalYStep = 0.f;
 
 	if (!m_isLocked) {
 		updateJump(dtModified);
@@ -147,7 +149,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 			}
 		}
 
-		// m_yVelocityRelated3 = yOffset;
+		// m_diagonalYStep = yOffset;
 
 		double& yDispAdjustment = GET_PLAYER_FIELD(this, m_yDispAdjustment);
 		bool logDebug = config::debugModeEnabled && yDispAdjustment != 0.0;
@@ -158,10 +160,10 @@ void SIPlayerObject::processPlayerTick(float dt) {
 			log::debug("m_yDispAdjustment: {}", yDispAdjustment);
 		}
 
-		m_yVelocityRelated3 = yOffset += yDispAdjustment;
+		m_diagonalYStep = yOffset += yDispAdjustment;
 
 		if (logDebug) {
-			log::debug("total ypos displacement: {}", m_yVelocityRelated3);
+			log::debug("total ypos displacement: {}", m_diagonalYStep);
 		}
 
 		yDispAdjustment = 0.0;
@@ -172,7 +174,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 			xOffset = xOffset * -1;
 		}
 
-		xOffset = xOffset + m_maybeReverseAcceleration;
+		xOffset = xOffset + m_reverseSyncStep;
 
 		double finalYOffset = yOffset;
 		if (m_isSideways) {
@@ -185,7 +187,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		auto offsetPosition = position + frameOffset;
 		setPosition(offsetPosition);
 
-		m_maybeReverseAcceleration = 0;
+		m_reverseSyncStep = 0;
 		double reverseSpeed = m_maybeReverseSpeed;
 
 		if (reverseSpeed != 0) {
@@ -198,7 +200,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 				reverseStep = -reverseStep;
 			}
 
-			m_maybeReverseAcceleration = reverseStep;
+			m_reverseSyncStep = reverseStep;
 			m_maybeReverseSpeed = reverseSpeed - reverseStep;
 		}
 	}
@@ -216,7 +218,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 			}
 		}
 	} else if (!m_isBird && !m_isSwing && !m_isDart) {
-		if ((!m_isOnGround2 || levelFlipping() || m_isLocked || m_isHidden) ||
+		if ((!m_touchingGround || levelFlipping() || m_isLocked || m_isHidden) ||
 			(m_isPlatformer && std::abs(m_platformerXVelocity) <= 2.5)) {
 			if (m_hasGroundParticles) {
 				auto action = getActionByTag(3);
@@ -237,10 +239,9 @@ void SIPlayerObject::processPlayerTick(float dt) {
 	}
 
 	bool active = !m_isLocked && !m_isHidden;
-	bool moving =
-		!m_isPlatformer || m_holdingLeft || m_holdingRight || m_platformerMovingLeft || m_platformerMovingRight;
+	bool moving = !m_isPlatformer || m_holdingLeft || m_holdingRight || m_forcedSlideLeft || m_forcedSlideRight;
 
-	if (!m_isDart && (isFlying()) && m_isOnGround2 && m_yVelocity * flipMod() > -1 && active && moving) {
+	if (!m_isDart && (isFlying()) && m_touchingGround && m_yVelocity * flipMod() > -1 && active && moving) {
 		m_vehicleGroundParticles->resumeSystem();
 	} else {
 		m_vehicleGroundParticles->stopSystem();
@@ -265,7 +266,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 	}
 
 	if (m_robotFire) {
-		bool shouldDisable = !m_isRobot || !m_jumpBuffered || m_touchedPad || !m_maybeIsBoosted ||
+		bool shouldDisable = !m_isRobot || !m_jumpBuffered || m_touchedPad || !m_isRising ||
 			m_accelerationOrSpeed <= 0.27f || m_accelerationOrSpeed >= 1.5f;
 		bool isVisible = m_robotFire->isVisible();
 
@@ -302,7 +303,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 	}
 
 	bool shouldDisableBurst = !m_isRobot || !m_jumpBuffered || m_touchedPad || m_isHidden ||
-		(!m_maybeIsBoosted && m_accelerationOrSpeed <= 0.1f) || (m_accelerationOrSpeed >= 1.5f);
+		(!m_isRising && m_accelerationOrSpeed <= 0.1f) || (m_accelerationOrSpeed >= 1.5f);
 	bool isRunning = m_robotBurstParticles->isActive();
 
 	if (shouldDisableBurst) {
@@ -315,7 +316,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		}
 	}
 
-	m_maybeSpriteRelated = false;
+	m_specialGroundHit = false;
 
 	if (m_ghostTrail) {
 		CCPoint ghostPos;

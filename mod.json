@@ -6,7 +6,7 @@
 	},
 	"id": "chizz.superb-input-precision",
 	"name": "Superb Input Precision",
-	"version": "v1.0.0",
+	"version": "v1.0.0-pr.1",
 	"developer": "chizz",
 	"description": "Reworks input handling for subtick precision.",
 	"tags": [
@@ -33,7 +33,7 @@
 			"description": "How frequently the game checks for your input. Higher values = more responsive/precise. Set to 240 for vanilla click-on-steps behavior, 480 for CBS equivalent, or use \"Instantaneous Inputs\" for legacy CBF behavior.",
 			"type": "float",
 			"default": 240,
-			"min": 60,
+			"min": 240,
 			"max": 10000,
 			"control": {
 				"slider": false

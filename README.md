@@ -39,11 +39,13 @@ Superb Input Precision takes a different approach. Vanilla still owns the physic
 
 - **Y velocity correction:** gravity should only act on each velocity for the part of the tick it actually existed. For inputs that set and override your velocity (like a cube jump), the gravity before the input is thrown away and only the remaining part of the tick counts. For inputs that change acceleration (like holding or releasing in ship), the tick gets a mix of the old and new gravity. The velocity is adjusted once to automatically account for either scenario depending on the input. Like the Y position correction, several inputs in a tick are each handled, in order.
 
-Note: that corrected velocity is a value vanilla could never produce, since it only ever applies gravity in whole ticks. Any method that allows subtick input precision (tick splitting included) has to end up at that same velocity, because that's what an input partway through a tick means. The difference is that this mod gets there without running extra physics ticks. When Velocity Unrounding is off, the corrected velocity is still rounded to 3 decimal places like any vanilla velocity.
+> Note: that corrected velocity is a value vanilla could never produce, since it only ever applies gravity in whole ticks. Any method that allows subtick input precision (tick splitting included) has to end up at that same velocity, because that's what an input partway through a tick means. The difference is that this mod gets there without running extra physics ticks. When Velocity Unrounding is off, the corrected velocity is still rounded to 3 decimal places like any vanilla velocity.
 
 Inputs fire at the most recent input sample (rate is customizable in mod settings) or immediately (if Instantaneous Inputs is enabled), and the corrections handle where the player should be.
 
 **Wave is the one exception:** because wave velocity is constant between inputs (no acceleration), tick splitting doesn't cause the displacement error above. So for wave, the tick is split at the input point, which is the most accurate (and simplest) option. Every other gamemode uses the corrections instead. This does mean that unlike vanilla, wave gets collision checks in between ticks.
+
+> Note: if at least one player is wave, every input for that tick uses tick split method, even if the other player may not be wave.
 
 The result is subtick input precision that aims to stay as faithful to vanilla physics as possible.
 

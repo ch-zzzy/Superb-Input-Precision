@@ -1,11 +1,16 @@
 # Changelog
 
-## v1.0.0
+## v1.0.0-prerelease.1
 
 - port to 2.2091, luckily nothing important changed
 - no mac or ios support until some geode bindings stuff are fixed
 - fixed velocity unrounding not enabling patches on startup when the setting was already enabled
+- fixed velocity corrections from a previous attempt carrying over after respawning
 - fixed gd's "phantom" inputs at the start of any attempt breaking stuff for wave
+- fixed wave inputs going to the wrong player (or only one player) with p2 bound keys, flipped 2-player controls, and dual mode
+- if any player is a wave, all players now use tick splitting for that tick
+- input ratios now stay accurate with speedhack and timewarp triggers
+- getInputQueueWithRatios and setInputQueueWithRatios have been moved from subtickinputs to subtickinputs::api
 - getInputQueueWithRatios no longer clamps all inputs to one tick
 - pls lmk if you're experiencing any bugs that didn't exist before
 

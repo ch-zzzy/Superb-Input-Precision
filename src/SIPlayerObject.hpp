@@ -4,23 +4,15 @@
 
 #include "SubtickInputs.hpp"
 
-namespace subtickinputs::fields {
-	struct PendingWaveInput {
-		double m_ratio;
-		bool m_isPush;
-		int m_button;
-	};
-} // namespace subtickinputs::fields
-
 class $modify(SIPlayerObject, PlayerObject) {
 	struct Fields {
 		bool m_updateJumpCalled = false;
 		double m_yDispAdjustment = 0.0;
 		double m_yVelAdjustment = 0.0;
-		std::vector<subtickinputs::fields::PendingWaveInput> m_pendingWaveInputs;
-		bool m_didWaveSplit = false;
-		float m_rotationDelta = 0.0f;
-		CCPoint m_preTickPosition;
+		bool m_didSplit = false;
+		bool m_skipNextUpdate = false; // already moved during the other player's update this tick
+		float m_remainingRotationDelta = 0.0f;
+		CCPoint m_tickStartPosition;
 	};
 
 	static void onModify(auto& self) {
