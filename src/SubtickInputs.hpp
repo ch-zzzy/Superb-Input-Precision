@@ -21,7 +21,7 @@ namespace subtickinputs {
 	void toggleVelocityUnroundingPatches(bool enable);
 
 	namespace config {
-		inline float inputHz = 240.0f;
+		inline double inputHz = 240.0;
 		inline bool instantInputsEnabled = false;
 		inline bool velocityUnroundingEnabled = false;
 		inline bool modEnabled = false;

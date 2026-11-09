@@ -8,8 +8,9 @@
 - fixed velocity corrections from a previous attempt carrying over after respawning
 - fixed gd's "phantom" inputs at the start of any attempt breaking stuff for wave
 - fixed wave inputs going to the wrong player (or only one player) with p2 bound keys, flipped 2-player controls, and dual mode
+- input ratios and velocity corrections now stay accurate with speedhack and timewarp triggers
 - if any player is a wave, all players now use tick splitting for that tick
-- input ratios now stay accurate with speedhack and timewarp triggers
+- input hz is now a double instead of a float, and its minimum has been raised from 60 to 240 (it never did anything below tps anyways)
 - getInputQueueWithRatios and setInputQueueWithRatios have been moved from subtickinputs to subtickinputs::api
 - getInputQueueWithRatios no longer clamps all inputs to one tick
 - pls lmk if you're experiencing any bugs that didn't exist before

@@ -56,7 +56,7 @@ void SIPlayerObject::update(float dt) {
 
 	PlayerObject* player2 = playLayer->m_player2;
 	bool isDual = playLayer->m_gameState.m_isDualMode;
-	bool splitOtherPlayer = player2 && this == playLayer->m_player1 && isDual;
+	bool splitOtherPlayer = player2 && isPlayer1() && isDual;
 	if (splitOtherPlayer) {
 		splitPlayers.push_back({player2, player2->getPosition(), player2->m_isOnGround});
 		GET_PLAYER_FIELD(player2, m_skipNextUpdate) = true;
@@ -83,7 +83,7 @@ static void splitTick(PlayLayer* playLayer, std::vector<SplitPlayer>& splitPlaye
 		for (auto& splitPlayer : splitPlayers) {
 			PlayerObject* player = splitPlayer.m_player;
 
-			if (player == playLayer->m_player2 && !playLayer->m_gameState.m_isDualMode) continue;
+			if (player->isPlayer2() && !playLayer->m_gameState.m_isDualMode) continue;
 
 			player->update(segmentDt);
 			splitPlayer.m_totalYStep += player->m_diagonalYStep;
@@ -115,7 +115,7 @@ static void splitTick(PlayLayer* playLayer, std::vector<SplitPlayer>& splitPlaye
 	for (auto& splitPlayer : splitPlayers) {
 		PlayerObject* player = splitPlayer.m_player;
 
-		if (player == playLayer->m_player2 && !playLayer->m_gameState.m_isDualMode) {
+		if (player->isPlayer2() && !playLayer->m_gameState.m_isDualMode) {
 			GET_PLAYER_FIELD(player, m_skipNextUpdate) = false;
 			continue;
 		}

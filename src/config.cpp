@@ -39,7 +39,7 @@ $on_mod(Loaded) {
 		config::applyClickSettings(PlayLayer::get());
 	});
 
-	settingInit(config::inputHz, "input-hz", [](float val) { config::inputHz = val; });
+	settingInit(config::inputHz, "input-hz", [](double val) { config::inputHz = val; });
 
 	settingInit(config::instantInputsEnabled, "instant-inputs", [](bool val) { config::instantInputsEnabled = val; });
 

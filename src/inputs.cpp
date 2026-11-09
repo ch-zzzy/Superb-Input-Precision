@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <initializer_list>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -18,14 +19,9 @@ using namespace subtickinputs;
 using namespace subtickinputs::fields;
 
 namespace {
-	// input timestamps are realtime, while m_timestamp only advances by gametime
-	// which speedhack, timewarp and the rounding to whole ticks (leftover carried to the next frame) stretch or shrink
-	struct FrameTiming {
-		double m_realStart = 0.0; // m_timestamp on entry, vanilla sets it to the previous frame's clock read
-		double m_realEnd = 0.0;	  // clock read at the start of this frame
-		int m_tickCount = 1;
-		int m_tickIndex = 0;
-		bool m_isValid = false;
+	struct TickDts {
+		double m_real;	 // realtime, what processCommands gets
+		float m_physics; // gametime, what PlayerObject::update gets
 	};
 
 	// where one tick is on realtime clock
@@ -41,20 +37,37 @@ namespace {
 			return m_start + ratio * m_duration;
 		}
 	};
+
+	// input timestamps are realtime, while m_timestamp only advances by gametime
+	// which speedhack, timewarp and the rounding to whole ticks (leftover carried to the next frame) stretch or shrink
+	struct FrameTiming {
+		// m_timestamp on entry, vanilla sets it to the previous frame's clock read
+		static inline double m_realStart = 0.0;
+		static inline double m_realEnd = 0.0; // clock read at the start of this frame
+		static inline int m_tickCount = 1;
+		static inline int m_tickIndex = 0;
+
+		// only set once getModifiedDelta runs, which vanilla skips while paused or not started
+		static inline std::optional<TickDts> m_tickDts;
+
+		// the dt processQueuedButtons gets is vanilla's real tick length cast to float, which loses precision
+		// and isn't what the player physics use under time warp, so use the exact values from getModifiedDelta instead
+		static TickDts getTickDts(float dt) {
+			return m_tickDts.value_or(TickDts{dt, 60.0f * dt});
+		}
+
+		static TickWindow getTickWindow(GJBaseGameLayer* gameLayer, float dt) {
+			bool hasRealSpan = m_tickDts && m_realEnd > m_realStart;
+			if (!hasRealSpan) {
+				return {gameLayer->m_timestamp, dt};
+			}
+
+			double tickDuration = (m_realEnd - m_realStart) / m_tickCount;
+			double tickStartTime = m_realStart + m_tickIndex * tickDuration;
+			return {tickStartTime, tickDuration};
+		}
+	};
 } // namespace
-
-static FrameTiming s_frameTiming;
-
-static TickWindow getCurrentTickWindow(GJBaseGameLayer* gameLayer, float dt) {
-	// outside a running frame there is no real span to use, so fall back to vanilla's gametime window
-	if (!s_frameTiming.m_isValid) {
-		return {gameLayer->m_timestamp, dt};
-	}
-
-	double tickDuration = (s_frameTiming.m_realEnd - s_frameTiming.m_realStart) / s_frameTiming.m_tickCount;
-	double tickStartTime = s_frameTiming.m_realStart + s_frameTiming.m_tickIndex * tickDuration;
-	return {tickStartTime, tickDuration};
-}
 
 static void processInputs(float dt, bool processEntireQueue);
 
@@ -77,33 +90,38 @@ class $modify(GJBaseGameLayer) {
 	}
 
 	void update(float dt) {
-		s_frameTiming.m_realStart = this->m_timestamp;
-		s_frameTiming.m_realEnd = utils::getInputTimestamp();
-		s_frameTiming.m_tickIndex = 0;
-		// only becomes valid once getModifiedDelta runs, which vanilla skips while paused or not started
-		s_frameTiming.m_isValid = false;
+		FrameTiming::m_realStart = this->m_timestamp;
+		FrameTiming::m_realEnd = utils::getInputTimestamp();
+		FrameTiming::m_tickIndex = 0;
+		FrameTiming::m_tickDts.reset();
 
 		GJBaseGameLayer::update(dt);
 
-		s_frameTiming.m_isValid = false;
+		FrameTiming::m_tickDts.reset();
 	}
 
 	double getModifiedDelta(float dt) {
 		double delta = GJBaseGameLayer::getModifiedDelta(dt);
 
-		// same calculations vanilla does
-		float timeWarp = std::min(this->m_gameState.m_timeWarp, 1.0f);
-		float tickCount = std::round(static_cast<float>(delta * 60.0 / timeWarp * 4.0));
+		// same calculations vanilla does in update
+		float timeWarp = this->m_gameState.m_timeWarp;
+		float tickCount = std::round(static_cast<float>(delta * 60.0 / std::min(timeWarp, 1.0f) * 4.0));
+		int ticks = std::max(1, static_cast<int>(tickCount));
 
-		s_frameTiming.m_tickCount = std::max(1, static_cast<int>(tickCount));
-		s_frameTiming.m_isValid = s_frameTiming.m_realEnd > s_frameTiming.m_realStart;
+		// applyTimeWarp also scales by 2.209 practice game speed setting while playing,
+		// which vanilla's delta / m_timeWarp doesn't remove
+		float gameSpeed = (std::abs(this->m_unk3380 - 1.0f) >= 0.01f && !this->m_unk7be) ? this->m_unk3380 : 1.0f;
+
+		FrameTiming::m_tickCount = ticks;
+		FrameTiming::m_tickDts =
+			TickDts{delta / timeWarp / gameSpeed / ticks, static_cast<float>(delta * 60.0 / ticks)};
 
 		return delta;
 	}
 
 	void processCommands(float dt, bool isHalfTick, bool isLastTick) {
 		GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
-		s_frameTiming.m_tickIndex++;
+		FrameTiming::m_tickIndex++;
 	}
 };
 
@@ -140,71 +158,82 @@ class $modify(PlayerObject) {
 	}
 };
 
-// made this to emulate the rounding from setYVelocity
-static double vanillaRoundValue(double value) {
-	if (config::velocityUnroundingEnabled) {
-		return value;
-	} else {
-		int integerPart = static_cast<int>(value);
-		return std::round((value - integerPart) * 1000.0) / 1000.0 + integerPart;
-	}
-}
+namespace {
+	// recreation of the y velocity changes from PlayerObject::updateJump and setYVelocity
+	struct Physics {
+		// emulates the rounding from setYVelocity
+		static double roundVelocity(double value) {
+			if (config::velocityUnroundingEnabled) {
+				return value;
+			} else {
+				int integerPart = static_cast<int>(value);
+				return std::round((value - integerPart) * 1000.0) / 1000.0 + integerPart;
+			}
+		}
 
-// recreation of the gravity calculations from PlayerObject::updateJump
-static float getRawDeltaVel(PlayerObject* player, float scaledDt) {
-	if (player->m_isDart) return 0.0f;
+		// the gravity from PlayerObject::updateJump
+		static float getRawDeltaVel(PlayerObject* player, float scaledDt) {
+			if (player->m_isDart) return 0.0f;
 
-	if (player->m_isRobot && player->m_isRising && player->m_jumpBuffered && !player->m_touchedPad &&
-		player->m_accelerationOrSpeed < 1.5f) {
-		return 0.0f;
-	}
+			if (player->m_isRobot && player->m_isRising && player->m_jumpBuffered && !player->m_touchedPad &&
+				player->m_accelerationOrSpeed < 1.5f) {
+				return 0.0f;
+			}
 
-	bool jumpBuffered = player->m_jumpBuffered;
-	bool fallingBugged = player->playerIsFallingBugged();
-	bool isMini = player->m_vehicleSize != 1.0f;
+			bool jumpBuffered = player->m_jumpBuffered;
+			bool fallingBugged = player->playerIsFallingBugged();
+			bool isMini = player->m_vehicleSize != 1.0f;
 
-	float rawBaseGravity = player->isInBasicMode() ? static_cast<float>(player->m_gravity) : 0.958199f;
-	float baseGravity = rawBaseGravity * player->m_gravityMod;
-	float sizeFactor = isMini ? (player->isFlying() ? 0.85f : 0.8f) : 1.0f;
+			float rawBaseGravity = player->isInBasicMode() ? static_cast<float>(player->m_gravity) : 0.958199f;
+			float baseGravity = rawBaseGravity * player->m_gravityMod;
+			float sizeFactor = isMini ? (player->isFlying() ? 0.85f : 0.8f) : 1.0f;
 
-	float gravPerTick;
+			float gravPerTick;
 
-	if (player->m_isShip) {
-		bool isFalling = player->m_yVelocity * player->flipMod() < 0.0;
-		bool forceNegative = player->m_isAccelerating ? isFalling : jumpBuffered;
+			if (player->m_isShip) {
+				bool isFalling = player->playerIsFalling(0.0f);
+				bool forceNegative = player->m_isAccelerating ? isFalling : jumpBuffered;
 
-		float shipYVelFactor = 0.8f;
-		if (forceNegative) shipYVelFactor = -1.0f;
-		if (!jumpBuffered && !fallingBugged) shipYVelFactor = 1.2f;
+				float shipYVelFactor = 0.8f;
+				if (forceNegative) shipYVelFactor = -1.0f;
+				if (!jumpBuffered && !fallingBugged) shipYVelFactor = 1.2f;
 
-		if (player->m_isPlatformer) baseGravity *= 0.8f;
+				if (player->m_isPlatformer) baseGravity *= 0.8f;
 
-		float effectiveBaseGrav = shipYVelFactor >= 0.0f ? baseGravity : rawBaseGravity;
-		float gravCoeff = (jumpBuffered && fallingBugged) ? 0.5f : 0.4f;
+				float effectiveBaseGrav = shipYVelFactor >= 0.0f ? baseGravity : rawBaseGravity;
+				float gravCoeff = (jumpBuffered && fallingBugged) ? 0.5f : 0.4f;
 
-		gravPerTick = scaledDt * effectiveBaseGrav * shipYVelFactor * gravCoeff / sizeFactor;
-	} else if (player->m_isBird) {
-		float ufoYVelFactor = fallingBugged ? 0.8f : 1.2f;
-		gravPerTick = scaledDt * baseGravity * ufoYVelFactor * 0.5f / sizeFactor;
-	} else if (player->m_isSwing) {
-		float swingSizeFactor = isMini ? 0.6f : 0.4f;
-		gravPerTick = scaledDt * baseGravity * swingSizeFactor;
-	} else {
-		float gravCoeff = 1.0f;
-		if (player->m_isBall || player->m_isSpider)
-			gravCoeff = 0.6f;
-		else if (player->m_isRobot)
-			gravCoeff = 0.9f;
+				gravPerTick = scaledDt * effectiveBaseGrav * shipYVelFactor * gravCoeff / sizeFactor;
+			} else if (player->m_isBird) {
+				float ufoYVelFactor = fallingBugged ? 0.8f : 1.2f;
+				gravPerTick = scaledDt * baseGravity * ufoYVelFactor * 0.5f / sizeFactor;
+			} else if (player->m_isSwing) {
+				float swingSizeFactor = isMini ? 0.6f : 0.4f;
+				gravPerTick = scaledDt * baseGravity * swingSizeFactor;
+			} else {
+				float gravCoeff = 1.0f;
+				if (player->m_isBall || player->m_isSpider)
+					gravCoeff = 0.6f;
+				else if (player->m_isRobot)
+					gravCoeff = 0.9f;
 
-		gravPerTick = scaledDt * baseGravity * gravCoeff;
-	}
+				gravPerTick = scaledDt * baseGravity * gravCoeff;
+			}
 
-	return player->flipMod() * gravPerTick;
-}
+			return player->flipMod() * gravPerTick;
+		}
 
-static double getDeltaVel(PlayerObject* player, float scaledDt) {
-	float dV = getRawDeltaVel(player, scaledDt);
-	return vanillaRoundValue(player->m_yVelocity - dV) - player->m_yVelocity;
+		static double getDeltaVel(PlayerObject* player, float scaledDt) {
+			float dV = getRawDeltaVel(player, scaledDt);
+			return roundVelocity(player->m_yVelocity - dV) - player->m_yVelocity;
+		}
+	};
+} // namespace
+
+static double quantizeRatio(double ratio, double inputSamplesPerTick) {
+	if (config::instantInputsEnabled) return ratio;
+	if (inputSamplesPerTick <= 1.0) return 0.0;
+	return std::floor(ratio * inputSamplesPerTick) / inputSamplesPerTick;
 }
 
 namespace {
@@ -233,9 +262,9 @@ namespace {
 
 		void advanceToInput(double ratio, float scaledDt) {
 			m_preVel = m_player->m_yVelocity;
-			m_preDv = getDeltaVel(m_player, scaledDt);
+			m_preDv = Physics::getDeltaVel(m_player, scaledDt);
 
-			m_finalVel -= getRawDeltaVel(m_player, scaledDt * (ratio - m_lastRatio));
+			m_finalVel -= Physics::getRawDeltaVel(m_player, scaledDt * (ratio - m_lastRatio));
 			m_lastRatio = ratio;
 		}
 
@@ -245,7 +274,7 @@ namespace {
 			if (!GET_PLAYER_FIELD(m_player, m_updateJumpCalled)) m_player->updateJump(0.0f);
 
 			double postVel = m_player->m_yVelocity;
-			double postDv = getDeltaVel(m_player, scaledDt);
+			double postDv = Physics::getDeltaVel(m_player, scaledDt);
 
 			double preInputVel = m_preVel + m_preDv;
 			double postInputVel = postVel + postDv;
@@ -255,7 +284,7 @@ namespace {
 			if (postVel != m_preVel) m_finalVel = postVel;
 
 			if (config::debugModeEnabled) {
-				int playerNumber = m_player == PlayLayer::get()->m_player1 ? 1 : 2;
+				int playerNumber = m_player->isPlayer1() ? 1 : 2;
 				log::debug(
 					"p{} preVel: {}, postVel: {}, preDv: {}, postDv: {}, "
 					"dt: {}, scaledDt: {}, rawRatio: {}, ratio: {}, inputSamplesPerTick: {}, "
@@ -265,25 +294,26 @@ namespace {
 			}
 		}
 
-		void computeAdjustments(float scaledDt, double tps) {
+		void computeAdjustments(float scaledDt, float physicsTickDt) {
 			if (m_player->m_isDart) {
 				// probably redundant since it's only dash orbs that can reach here
-				double waveDt = 60.0 / tps * ((m_player->m_vehicleSize != 1.0f) ? 2.0 : 1.0);
+				double waveDt = physicsTickDt * ((m_player->m_vehicleSize != 1.0f) ? 2.0 : 1.0);
 				GET_PLAYER_FIELD(m_player, m_yDispAdjustment) = m_adjustedYVel * waveDt;
 			} else {
 				GET_PLAYER_FIELD(m_player, m_yDispAdjustment) = m_adjustedYVel * scaledDt;
 			}
 
-			m_finalVel -= getRawDeltaVel(m_player, scaledDt * (1.0 - m_lastRatio));
-			double predictedVanillaVel = vanillaRoundValue(m_player->m_yVelocity - getRawDeltaVel(m_player, scaledDt));
+			m_finalVel -= Physics::getRawDeltaVel(m_player, scaledDt * (1.0 - m_lastRatio));
+			double predictedVanillaVel =
+				Physics::roundVelocity(m_player->m_yVelocity - Physics::getRawDeltaVel(m_player, scaledDt));
 
 			double& yVelAdjustment = GET_PLAYER_FIELD(m_player, m_yVelAdjustment);
-			yVelAdjustment = vanillaRoundValue(m_finalVel) - predictedVanillaVel;
+			yVelAdjustment = Physics::roundVelocity(m_finalVel) - predictedVanillaVel;
 
 			bool logDebug = config::debugModeEnabled && yVelAdjustment != 0.0;
 			if (logDebug) {
 				log::debug("predicted vanilla velocity: {}", predictedVanillaVel);
-				log::debug("subtick velocity: {}", vanillaRoundValue(m_finalVel));
+				log::debug("subtick velocity: {}", Physics::roundVelocity(m_finalVel));
 				log::debug("m_yVelAdjustment: {}", yVelAdjustment);
 			}
 		}
@@ -296,10 +326,10 @@ static void processInputs(float dt, bool processEntireQueue) {
 
 	auto& inputQueue = playLayer->m_queuedButtons;
 
-	double tps = 1.0 / dt;
-	double inputSamplesPerTick = config::inputHz / tps;
-	float scaledDt = 60.0f * dt * 0.9f;
-	auto tickWindow = getCurrentTickWindow(playLayer, dt);
+	auto tickDts = FrameTiming::getTickDts(dt);
+	double inputSamplesPerTick = config::inputHz * tickDts.m_real; // realtime since input hz is real time
+	float scaledDt = tickDts.m_physics * 0.9f;					   // what PlayerObject::update passes to updateJump
+	auto tickWindow = FrameTiming::getTickWindow(playLayer, dt);
 
 	bool isDual = playLayer->m_gameState.m_isDualMode;
 
@@ -328,15 +358,7 @@ static void processInputs(float dt, bool processEntireQueue) {
 
 		processedCount++;
 
-		double ratio = std::clamp(rawRatio, 0.0, 1.0);
-
-		if (!config::instantInputsEnabled) {
-			if (inputSamplesPerTick > 1.0) {
-				ratio = std::floor(ratio * inputSamplesPerTick) / inputSamplesPerTick;
-			} else {
-				ratio = 0.0;
-			}
-		}
+		double ratio = quantizeRatio(std::clamp(rawRatio, 0.0, 1.0), inputSamplesPerTick);
 
 		if (splitThisTick && ratio > 0.0) {
 			// this is processed in SIPlayerObject::update in split_tick.cpp
@@ -359,7 +381,7 @@ static void processInputs(float dt, bool processEntireQueue) {
 	}
 
 	for (auto& state : playerStates) {
-		if (state.m_player) state.computeAdjustments(scaledDt, tps);
+		if (state.m_player) state.computeAdjustments(scaledDt, tickDts.m_physics);
 	}
 
 	inputQueue.erase(inputQueue.begin(), inputQueue.begin() + processedCount);
@@ -370,10 +392,9 @@ namespace subtickinputs::api {
 		auto* playLayer = PlayLayer::get();
 		if (!playLayer) return Err("playlayer is null");
 
-		double tps = 1.0 / dt;
-		double inputSamplesPerTick = config::inputHz / tps;
+		double inputSamplesPerTick = config::inputHz * FrameTiming::getTickDts(dt).m_real;
 
-		auto tickWindow = getCurrentTickWindow(playLayer, dt);
+		auto tickWindow = FrameTiming::getTickWindow(playLayer, dt);
 
 		std::vector<PlayerButtonCommandWithRatio> result;
 
@@ -382,13 +403,7 @@ namespace subtickinputs::api {
 
 			// only inputs inside this tick get quantized
 			bool isInThisTick = ratio >= 0.0 && ratio < 1.0;
-			if (isInThisTick && !config::instantInputsEnabled) {
-				if (inputSamplesPerTick > 1.0) {
-					ratio = std::floor(ratio * inputSamplesPerTick) / inputSamplesPerTick;
-				} else {
-					ratio = 0.0;
-				}
-			}
+			if (isInThisTick) ratio = quantizeRatio(ratio, inputSamplesPerTick);
 
 			result.push_back({input, ratio});
 		}
@@ -400,7 +415,7 @@ namespace subtickinputs::api {
 		auto* playLayer = PlayLayer::get();
 		if (!playLayer) return Err("playlayer is null");
 
-		auto tickWindow = getCurrentTickWindow(playLayer, dt);
+		auto tickWindow = FrameTiming::getTickWindow(playLayer, dt);
 
 		// no way this works 😂
 		playLayer->m_queuedButtons.clear();
