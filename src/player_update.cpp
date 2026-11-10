@@ -13,7 +13,7 @@ static std::string getFrameForStreak(ShipStreak type, float time);
 
 // modified rewrite of PlayerObject::update
 // called on every tick that isn't split or vanilla
-// modification at line: 152
+// modification at line: 153
 void SIPlayerObject::processPlayerTick(float dt) {
 	auto dtModified = dt * 0.9f;
 
@@ -22,13 +22,15 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		double duration = m_flashDuration;
 
 		if (elapsed < duration) {
-			float t = elapsed / duration;
+			if (elapsed > 0) {
+				float t = elapsed / duration;
 
-			auto mainColor = GameToolbox::multipliedColorValue(m_flashMainColor, m_originalMainColor, t);
-			auto secondColor = GameToolbox::multipliedColorValue(m_flashSecondColor, m_originalSecondColor, t);
+				auto mainColor = GameToolbox::multipliedColorValue(m_flashMainColor, m_originalMainColor, t);
+				auto secondColor = GameToolbox::multipliedColorValue(m_flashSecondColor, m_originalSecondColor, t);
 
-			setColor(mainColor);
-			setSecondColor(secondColor);
+				setColor(mainColor);
+				setSecondColor(secondColor);
+			}
 		} else {
 			m_flashTime = -1;
 
@@ -87,8 +89,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 				m_isAccelerating = true;
 			}
 
-			bool shouldAffectAcceleration =
-				(!m_isUpsideDown && stateForceYDelta > 0) || (m_isUpsideDown && stateForceYDelta < 0);
+			bool shouldAffectAcceleration = stateForceYDelta * flipMod() > 0;
 
 			if (shouldAffectAcceleration) {
 				m_accelerationOrSpeed = (stateForceYDelta / 12.94f) * 1.5 + m_accelerationOrSpeed;
@@ -126,7 +127,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		double xOffset = getCurrentXVelocity();
 		xOffset = xOffset * dt;
 
-		double reverseDecayStep = xOffset * 0.02;
+		double reverseDecayStep = xOffset * 0.02f;
 
 		if (isDashing) {
 			double dashY = m_dashY;
@@ -167,11 +168,10 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		}
 
 		yDispAdjustment = 0.0;
+		// end of modification
 
-		//
-
-		if (m_isGoingLeft && !m_isPlatformer) {
-			xOffset = xOffset * -1;
+		if (!m_isPlatformer) {
+			xOffset = xOffset * reverseMod();
 		}
 
 		xOffset = xOffset + m_reverseSyncStep;
@@ -217,7 +217,9 @@ void SIPlayerObject::processPlayerTick(float dt) {
 				m_hasShipParticles = true;
 			}
 		}
-	} else if (!m_isBird && !m_isSwing && !m_isDart) {
+	}
+
+	if (!isFlying()) {
 		if ((!m_touchingGround || levelFlipping() || m_isLocked || m_isHidden) ||
 			(m_isPlatformer && std::abs(m_platformerXVelocity) <= 2.5)) {
 			if (m_hasGroundParticles) {
@@ -226,6 +228,7 @@ void SIPlayerObject::processPlayerTick(float dt) {
 					auto call = CCCallFunc::create(this, callfunc_selector(PlayerObject::deactivateParticle));
 					auto delay = CCDelayTime::create(0.06);
 					action = CCSequence::create(delay, call, nullptr);
+					action->setTag(3);
 					runAction(action);
 				}
 			}
@@ -238,13 +241,15 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		}
 	}
 
-	bool active = !m_isLocked && !m_isHidden;
-	bool moving = !m_isPlatformer || m_holdingLeft || m_holdingRight || m_forcedSlideLeft || m_forcedSlideRight;
+	if (isFlying()) {
+		bool active = !m_isLocked && !m_isHidden;
+		bool moving = !m_isPlatformer || m_holdingLeft || m_holdingRight || m_forcedSlideLeft || m_forcedSlideRight;
 
-	if (!m_isDart && (isFlying()) && m_touchingGround && m_yVelocity * flipMod() > -1 && active && moving) {
-		m_vehicleGroundParticles->resumeSystem();
-	} else {
-		m_vehicleGroundParticles->stopSystem();
+		if (!m_isDart && m_touchingGround && m_yVelocity * flipMod() > -1 && active && moving) {
+			m_vehicleGroundParticles->resumeSystem();
+		} else {
+			m_vehicleGroundParticles->stopSystem();
+		}
 	}
 
 	m_waveTrail->m_pulseSize = (m_audioScale - 0.1) * 2.1 + 0.4;
@@ -286,15 +291,16 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		} else {
 			if (!isVisible) {
 				m_robotFire->stopAllActions();
-				m_robotFire->update(0.1f);
+				m_robotFire->setScale(0.1f);
 				m_robotFire->setVisible(true);
 
 				auto a1 = CCScaleTo::create(0.05f, 1.44f, 0.9f);
 				auto a2 = CCScaleTo::create(0.05f, 0.72f, 1.35f);
 				auto a3 = CCScaleTo::create(0.05f, 1.8f, 0.9f);
 				auto a4 = CCScaleTo::create(0.05f, 0.9f, 1.35f);
+				auto a5 = CCScaleTo::create(0.05f, 1.8f, 0.9f);
 
-				auto seq = CCSequence::create(a1, a2, a3, a4, nullptr);
+				auto seq = CCSequence::create(a1, a2, a3, a4, a5, nullptr);
 
 				m_robotFire->runAction(seq);
 				m_robotBurstParticles->resumeSystem();
@@ -302,8 +308,8 @@ void SIPlayerObject::processPlayerTick(float dt) {
 		}
 	}
 
-	bool shouldDisableBurst = !m_isRobot || !m_jumpBuffered || m_touchedPad || m_isHidden ||
-		(!m_isRising && m_accelerationOrSpeed <= 0.1f) || (m_accelerationOrSpeed >= 1.5f);
+	bool shouldDisableBurst = !m_isRobot || !m_jumpBuffered || m_touchedPad || m_isHidden || !m_isRising ||
+		m_accelerationOrSpeed <= 0.1f || m_accelerationOrSpeed >= 1.5f;
 	bool isRunning = m_robotBurstParticles->isActive();
 
 	if (shouldDisableBurst) {
