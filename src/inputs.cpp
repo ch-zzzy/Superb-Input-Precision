@@ -252,10 +252,24 @@ namespace {
 		explicit PlayerTickState(PlayerObject* player) : m_player(player) {
 			if (!m_player) return;
 
-			// apply the velocity carried over from last tick before anything reads it
+			// apply the velocity correction carried over from last tick before anything reads it
+			// unless something else changed the velocity since the prediction was calculated
 			double& yVelAdjustment = GET_PLAYER_FIELD(m_player, m_yVelAdjustment);
-			m_player->m_yVelocity += yVelAdjustment;
-			yVelAdjustment = 0.0;
+			if (yVelAdjustment != 0.0) {
+				constexpr double TOLERANCE = 1e-6;
+				double predictedYVel = GET_PLAYER_FIELD(m_player, m_predictedYVel);
+				double actualYVel = m_player->m_yVelocity;
+
+				bool matchesPrediction = std::abs(actualYVel - predictedYVel) < TOLERANCE;
+				if (matchesPrediction) m_player->m_yVelocity += yVelAdjustment;
+
+				if (config::debugModeEnabled) {
+					log::debug("{} m_yVelAdjustment: {}, predicted velocity: {}, actual velocity: {}",
+						matchesPrediction ? "applied" : "dropped", yVelAdjustment, predictedYVel, actualYVel);
+				}
+
+				yVelAdjustment = 0.0;
+			}
 
 			m_finalVel = m_player->m_yVelocity;
 		}
@@ -309,6 +323,7 @@ namespace {
 
 			double& yVelAdjustment = GET_PLAYER_FIELD(m_player, m_yVelAdjustment);
 			yVelAdjustment = Physics::roundVelocity(m_finalVel) - predictedVanillaVel;
+			GET_PLAYER_FIELD(m_player, m_predictedYVel) = predictedVanillaVel;
 
 			bool logDebug = config::debugModeEnabled && yVelAdjustment != 0.0;
 			if (logDebug) {
@@ -350,7 +365,7 @@ static void processInputs(float dt, bool processEntireQueue) {
 
 	size_t processedCount = 0;
 
-	for (auto& input : inputQueue) {
+	for (const auto& input : inputQueue) {
 		double rawRatio = tickWindow.getRatioFromTimestamp(input.m_timestamp);
 
 		// past the end of this tick, so it belongs to a later one
@@ -398,7 +413,7 @@ namespace subtickinputs::api {
 
 		std::vector<PlayerButtonCommandWithRatio> result;
 
-		for (auto& input : playLayer->m_queuedButtons) {
+		for (const auto& input : playLayer->m_queuedButtons) {
 			double ratio = tickWindow.getRatioFromTimestamp(input.m_timestamp);
 
 			// only inputs inside this tick get quantized

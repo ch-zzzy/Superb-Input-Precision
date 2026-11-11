@@ -12,7 +12,7 @@ struct PatchGroup {
 	std::vector<Patch*> appliedPatches;
 
 	void init(std::initializer_list<std::tuple<ptrdiff_t, size_t, uint8_t>> entries) {
-		for (auto& [offset, size, newValue] : entries) {
+		for (const auto& [offset, size, newValue] : entries) {
 			ByteVector potentialPatch(size, newValue);
 
 			auto result = Mod::get()->patch(reinterpret_cast<void*>(base::get() + offset), potentialPatch);

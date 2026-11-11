@@ -75,8 +75,8 @@ static void splitTick(PlayLayer* playLayer, std::vector<SplitPlayer>& splitPlaye
 
 	s_isSplitting = true;
 
-	for (auto& pending : s_pendingSplitInputs) {
-		auto& input = pending.m_command;
+	for (const auto& pending : s_pendingSplitInputs) {
+		const auto& input = pending.m_command;
 		double segment = std::clamp(pending.m_ratio - lastRatio, EPSILON, 1.0);
 		float segmentDt = static_cast<float>(segment * dt);
 

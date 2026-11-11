@@ -9,6 +9,7 @@ class $modify(SIPlayerObject, PlayerObject) {
 		bool m_updateJumpCalled = false;
 		double m_yDispAdjustment = 0.0;
 		double m_yVelAdjustment = 0.0;
+		double m_predictedYVel = 0.0; // what m_yVelocity *should* be when m_yVelAdjustment gets applied
 		bool m_didSplit = false;
 		bool m_skipNextUpdate = false; // already moved during the other player's update this tick
 		float m_remainingRotationDelta = 0.0f;
