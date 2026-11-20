@@ -3,7 +3,6 @@
 ## v1.0.0-prerelease.1
 
 - port to 2.2091, luckily nothing important changed
-- no mac or ios support until some geode bindings stuff are fixed
 - fixed some more slight issues with PlayerObject::update rewrite
 - fixed velocity unrounding not enabling patches on startup when the setting was already enabled
 - fixed velocity corrections from a previous attempt carrying over after respawning
