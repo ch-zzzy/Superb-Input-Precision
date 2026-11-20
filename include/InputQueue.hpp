@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Geode/binding/PlayerButtonCommand.hpp>
-#include <Geode/loader/Dispatch.hpp>
+#include <Geode/loader/EventExport.hpp>
 #include <vector>
 
 #undef MY_MOD_ID
