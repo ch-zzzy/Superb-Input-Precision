@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.0-prerelease.2
+
+- writing pr instead of prerelease apparently doesn't work 🫩
+
 ## v1.0.0-prerelease.1
 
 - port to 2.2091, luckily nothing important changed
