@@ -159,7 +159,7 @@ class $modify(PlayerObject) {
 };
 
 namespace {
-	// recreation of the y velocity changes from PlayerObject::updateJump and setYVelocity
+	// recreation of the y movement from PlayerObject::update, updateJump and setYVelocity
 	struct Physics {
 		// emulates the rounding from setYVelocity
 		static double roundVelocity(double value) {
@@ -223,9 +223,62 @@ namespace {
 			return player->flipMod() * gravPerTick;
 		}
 
-		static double getDeltaVel(PlayerObject* player, float scaledDt) {
-			float dV = getRawDeltaVel(player, scaledDt);
-			return roundVelocity(player->m_yVelocity - dV) - player->m_yVelocity;
+		// the y velocity added by force blocks in PlayerObject::update
+		static double getStateForceDelta(PlayerObject* player, float scaledDt) {
+			if (player->m_stateForce <= 0) return 0.0;
+
+			float modeForceScale = 1.0f;
+			if (player->m_isShip) {
+				modeForceScale = 0.47f;
+			} else if (player->m_isBird) {
+				modeForceScale = 0.58f;
+			} else if (player->m_isSwing) {
+				modeForceScale = 0.4f;
+			} else if (player->m_isBall || player->m_isSpider) {
+				modeForceScale = 0.6f;
+			} else if (player->m_isRobot) {
+				modeForceScale = 0.9f;
+			}
+
+			if (player->m_vehicleSize != 1.0f) {
+				if (player->m_isShip) {
+					modeForceScale = 0.5875f;
+				} else if (player->m_isBird) {
+					modeForceScale = 0.72499996f;
+				} else if (player->m_isSwing) {
+					modeForceScale = 0.61538464f;
+				}
+			}
+
+			return static_cast<double>(scaledDt * player->m_stateForceVector.y * modeForceScale);
+		}
+
+		// the y displacement PlayerObject::update would apply this tick, given the player's current state
+		// does NOT account for like collisions and stuff as those happen after PlayerObject::update
+		static double getYDisplacement(PlayerObject* player, float scaledDt, float physicsDt) {
+			if (player->m_isDead || player->m_isLocked) return 0.0;
+
+			double xOffset = player->getCurrentXVelocity() * physicsDt;
+
+			if (player->m_isDashing) {
+				double dashStep = player->m_isPlatformer ? scaledDt : xOffset;
+				return player->m_dashY * dashStep;
+			}
+
+			if (player->m_isDart) {
+				int bufferMod = player->m_jumpBuffered ? 1 : -1;
+				double yOffset = std::abs(xOffset) * player->flipMod() * bufferMod;
+				return player->m_vehicleSize != 1.0f ? yOffset * 2.0 : yOffset;
+			}
+
+			double yVel = roundVelocity(player->m_yVelocity - getRawDeltaVel(player, scaledDt));
+			yVel = roundVelocity(yVel + getStateForceDelta(player, scaledDt));
+			return yVel * scaledDt;
+		}
+
+		// the position along the axis that update applies the y displacement to
+		static float getMovementAxisPos(PlayerObject* player) {
+			return player->m_isSideways ? player->getPositionX() : player->getPositionY();
 		}
 	};
 } // namespace
@@ -240,16 +293,20 @@ namespace {
 	// everything processInputs tracks for one player over one tick
 	struct PlayerTickState {
 		PlayerObject* m_player;
+		float m_physicsDt; // what PlayerObject::update receives
+		float m_scaledDt;  // what PlayerObject::update passes to updateJump
 
-		double m_adjustedYVel = 0.0;
-		double m_finalVel = 0.0;
+		double m_adjustedYDisp = 0.0;
+		double m_accurateVel = 0.0; // y velocity at m_lastRatio, as if inputs happened mid-tick
 		double m_lastRatio = 0.0;
 
 		// captured right before each input
 		double m_preVel = 0.0;
-		double m_preDv = 0.0;
+		double m_preDisp = 0.0; // what a full tick of displacement would have been before the input
+		float m_prePos = 0.0f;
 
-		explicit PlayerTickState(PlayerObject* player) : m_player(player) {
+		PlayerTickState(PlayerObject* player, const TickDts& tickDts)
+			: m_player(player), m_physicsDt(tickDts.m_physics), m_scaledDt(tickDts.m_physics * 0.9f) {
 			if (!m_player) return;
 
 			// apply the velocity correction carried over from last tick before anything reads it
@@ -271,64 +328,61 @@ namespace {
 				yVelAdjustment = 0.0;
 			}
 
-			m_finalVel = m_player->m_yVelocity;
+			m_accurateVel = m_player->m_yVelocity;
 		}
 
-		void advanceToInput(double ratio, float scaledDt) {
+		void advanceToInput(double ratio) {
 			m_preVel = m_player->m_yVelocity;
-			m_preDv = Physics::getDeltaVel(m_player, scaledDt);
+			m_preDisp = Physics::getYDisplacement(m_player, m_scaledDt, m_physicsDt);
+			m_prePos = Physics::getMovementAxisPos(m_player);
 
-			m_finalVel -= Physics::getRawDeltaVel(m_player, scaledDt * (ratio - m_lastRatio));
+			m_accurateVel -= Physics::getRawDeltaVel(m_player, m_scaledDt * (ratio - m_lastRatio));
 			m_lastRatio = ratio;
 		}
 
-		void applyInputResult(double ratio, double rawRatio, float dt, float scaledDt, double inputSamplesPerTick) {
+		void applyInputResult(double ratio, double rawRatio, double inputSamplesPerTick) {
 			// vanilla explicitly does updateJump(0) but only for certain gamemodes
 			// the checks avoid double calling for those gamemodes
 			if (!GET_PLAYER_FIELD(m_player, m_updateJumpCalled)) m_player->updateJump(0.0f);
 
 			double postVel = m_player->m_yVelocity;
-			double postDv = Physics::getDeltaVel(m_player, scaledDt);
+			double postDisp = Physics::getYDisplacement(m_player, m_scaledDt, m_physicsDt);
 
-			double preInputVel = m_preVel + m_preDv;
-			double postInputVel = postVel + postDv;
+			// a teleport overwrites the position, so the movement from before the input doesn't count
+			bool teleported = Physics::getMovementAxisPos(m_player) != m_prePos;
+			double preDisp = teleported ? 0.0 : m_preDisp;
 
-			m_adjustedYVel += ratio * (preInputVel - postInputVel);
+			// both pre and postDisp represent displacement over a full tick, before and after applying the input
+			m_adjustedYDisp += ratio * (preDisp - postDisp);
 
-			if (postVel != m_preVel) m_finalVel = postVel;
+			if (postVel != m_preVel) m_accurateVel = postVel;
 
 			if (config::debugModeEnabled) {
 				int playerNumber = m_player->isPlayer1() ? 1 : 2;
 				log::debug(
-					"p{} preVel: {}, postVel: {}, preDv: {}, postDv: {}, "
-					"dt: {}, scaledDt: {}, rawRatio: {}, ratio: {}, inputSamplesPerTick: {}, "
-					"adjustedYVel: {}, finalVel: {}",
-					playerNumber, m_preVel, postVel, m_preDv, postDv, dt, scaledDt, rawRatio, ratio,
-					inputSamplesPerTick, m_adjustedYVel, m_finalVel);
+					"p{} preVel: {}, postVel: {}, preDisp: {}, postDisp: {}, teleported: {}, "
+					"physicsDt: {}, scaledDt: {}, rawRatio: {}, ratio: {}, inputSamplesPerTick: {}, "
+					"adjustedYDisp: {}, accurateVel: {}",
+					playerNumber, m_preVel, postVel, m_preDisp, postDisp, teleported, m_physicsDt, m_scaledDt, rawRatio,
+					ratio, inputSamplesPerTick, m_adjustedYDisp, m_accurateVel);
 			}
 		}
 
-		void computeAdjustments(float scaledDt, float physicsTickDt) {
-			if (m_player->m_isDart) {
-				// probably redundant since it's only dash orbs that can reach here
-				double waveDt = physicsTickDt * ((m_player->m_vehicleSize != 1.0f) ? 2.0 : 1.0);
-				GET_PLAYER_FIELD(m_player, m_yDispAdjustment) = m_adjustedYVel * waveDt;
-			} else {
-				GET_PLAYER_FIELD(m_player, m_yDispAdjustment) = m_adjustedYVel * scaledDt;
-			}
+		void computeAdjustments() {
+			GET_PLAYER_FIELD(m_player, m_yDispAdjustment) = m_adjustedYDisp;
 
-			m_finalVel -= Physics::getRawDeltaVel(m_player, scaledDt * (1.0 - m_lastRatio));
+			m_accurateVel -= Physics::getRawDeltaVel(m_player, m_scaledDt * (1.0 - m_lastRatio));
 			double predictedVanillaVel =
-				Physics::roundVelocity(m_player->m_yVelocity - Physics::getRawDeltaVel(m_player, scaledDt));
+				Physics::roundVelocity(m_player->m_yVelocity - Physics::getRawDeltaVel(m_player, m_scaledDt));
 
 			double& yVelAdjustment = GET_PLAYER_FIELD(m_player, m_yVelAdjustment);
-			yVelAdjustment = Physics::roundVelocity(m_finalVel) - predictedVanillaVel;
+			yVelAdjustment = Physics::roundVelocity(m_accurateVel) - predictedVanillaVel;
 			GET_PLAYER_FIELD(m_player, m_predictedYVel) = predictedVanillaVel;
 
 			bool logDebug = config::debugModeEnabled && yVelAdjustment != 0.0;
 			if (logDebug) {
 				log::debug("predicted vanilla velocity: {}", predictedVanillaVel);
-				log::debug("subtick velocity: {}", Physics::roundVelocity(m_finalVel));
+				log::debug("accurate velocity: {}", Physics::roundVelocity(m_accurateVel));
 				log::debug("m_yVelAdjustment: {}", yVelAdjustment);
 			}
 		}
@@ -361,7 +415,10 @@ static void processInputs(float dt, bool processEntireQueue) {
 		p2 = nullptr;
 	}
 
-	PlayerTickState playerStates[2] = {PlayerTickState(p1), PlayerTickState(p2)};
+	PlayerTickState playerStates[2] = {
+		PlayerTickState(p1, tickDts),
+		PlayerTickState(p2, tickDts),
+	};
 
 	size_t processedCount = 0;
 
@@ -383,7 +440,7 @@ static void processInputs(float dt, bool processEntireQueue) {
 
 		for (auto& state : playerStates) {
 			if (state.m_player) {
-				state.advanceToInput(ratio, scaledDt);
+				state.advanceToInput(ratio);
 				GET_PLAYER_FIELD(state.m_player, m_updateJumpCalled) = false;
 			}
 		}
@@ -391,12 +448,12 @@ static void processInputs(float dt, bool processEntireQueue) {
 		playLayer->handleButton(input.m_isPush, static_cast<int>(input.m_button), !input.m_isPlayer2);
 
 		for (auto& state : playerStates) {
-			if (state.m_player) state.applyInputResult(ratio, rawRatio, dt, scaledDt, inputSamplesPerTick);
+			if (state.m_player) state.applyInputResult(ratio, rawRatio, inputSamplesPerTick);
 		}
 	}
 
 	for (auto& state : playerStates) {
-		if (state.m_player) state.computeAdjustments(scaledDt, tickDts.m_physics);
+		if (state.m_player) state.computeAdjustments();
 	}
 
 	inputQueue.erase(inputQueue.begin(), inputQueue.begin() + processedCount);

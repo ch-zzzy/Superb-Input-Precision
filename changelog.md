@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.0-prerelease.3
+
+- fixed the position correction using normal gravity instead of the dash when clicking a dash orb
+- fixed the position correction counting movement from before a teleport (spider, spider orbs, teleport orbs)
+- the position correction now accounts for force blocks
+
 ## v1.0.0-prerelease.2
 
 - writing pr instead of prerelease apparently doesn't work 🫩
