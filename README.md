@@ -12,7 +12,7 @@ Click Between Steps and Click Between Frames both use a method called **tick spl
 The problem is that tick splitting doesn't reproduce vanilla physics exactly for gravity based modes. For example, a cube at 1x speed falling under gravity at 240 TPS:
 
 - Gravity per tick: `0.958199 * (54/240) = 0.215594775` yvels/tick
-- Starting velocity: 0 yvels
+- Starting velocity: 0.0 yvels
 
 **Vanilla (one full tick):**
 `v = 0 - 0.215594775 = -0.215594775`
