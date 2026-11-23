@@ -2,9 +2,9 @@
 
 ## v1.0.0-prerelease.3
 
-- fixed the position correction using normal gravity instead of the dash when clicking a dash orb
-- fixed the position correction counting movement from before a teleport (spider, spider orbs, teleport orbs)
-- the position correction now accounts for force blocks
+- sip now gets the tick count and timings from what vanilla actually used instead of assuming 240 tps, so it should work with tps bypasses
+- fixed inputs after a timewarp change bunching up at the start of the next tick when the change happened mid frame
+- fixed position corrections occasionally being applied on a later tick than intended (e.g. after the player was locked)
 
 ## v1.0.0-prerelease.2
 

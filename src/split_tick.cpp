@@ -40,6 +40,7 @@ void SIPlayerObject::update(float dt) {
 
 	if (useVanilla()) {
 		GET_PLAYER_FIELD(this, m_didSplit) = false;
+		GET_PLAYER_FIELD(this, m_yDispAdjustment) = 0.0;
 		PlayerObject::update(dt); // completely vanilla, full dt, full tick
 		return;
 	}
@@ -48,6 +49,8 @@ void SIPlayerObject::update(float dt) {
 	if (s_pendingSplitInputs.empty() || !playLayer) {
 		GET_PLAYER_FIELD(this, m_didSplit) = false;
 		processPlayerTick(dt); // full tick, with adjustments
+
+		GET_PLAYER_FIELD(this, m_yDispAdjustment) = 0.0; // processPlayerTick never clears this when dead or locked
 		return;
 	}
 
@@ -114,6 +117,9 @@ static void splitTick(PlayLayer* playLayer, std::vector<SplitPlayer>& splitPlaye
 	float remainingDelta = static_cast<float>((1.0 - lastRatio) * dt);
 	for (auto& splitPlayer : splitPlayers) {
 		PlayerObject* player = splitPlayer.m_player;
+
+		// split ticks don't apply displacement adjustments, and they're only meant for the current tick
+		GET_PLAYER_FIELD(player, m_yDispAdjustment) = 0.0;
 
 		if (player->isPlayer2() && !playLayer->m_gameState.m_isDualMode) {
 			GET_PLAYER_FIELD(player, m_skipNextUpdate) = false;

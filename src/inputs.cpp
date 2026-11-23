@@ -19,52 +19,144 @@ using namespace subtickinputs;
 using namespace subtickinputs::fields;
 
 namespace {
-	struct TickDts {
-		double m_real;	 // realtime, what processCommands gets
-		float m_physics; // gametime, what PlayerObject::update gets
+	// what vanilla used for this frame, captured when getModifiedDelta runs
+	struct FrameInfo {
+		double m_realStart; // m_timestamp, vanilla sets it to the previous frame's clock read
+		double m_realEnd;	// clock read at the start of this frame
+		double m_delta;		// what getModifiedDelta returned
+		float m_timeWarp;
+		float m_timeScale;	 // what cocos scaled this frame's dt by, timeWarp * game speed
+		int m_tickIndex = 0; // ticks already run this frame (or this re-run), not since the level started
+		std::optional<double> m_lastTickEnd; // where the last tick ended, carried into a timewarp re-run
 	};
 
-	// where one tick is on realtime clock
-	struct TickWindow {
-		double m_start;
-		double m_duration;
+	// one tick's timing, for placing inputs within it and for the player physics
+	struct TickInfo {
+		double m_realDt;   // realtime tick length, what input hz is relative to
+		float m_physicsDt; // gametime, what PlayerObject::update gets
+		double m_start;	   // where the tick starts on the input timestamp clock
+		double m_end;	   // where it ends on that clock
+
+		double getDuration() const {
+			return m_end - m_start;
+		}
 
 		double getRatioFromTimestamp(double timestamp) const {
-			return (timestamp - m_start) / m_duration;
+			return (timestamp - m_start) / getDuration();
 		}
 
 		double getTimestampFromRatio(double ratio) const {
-			return m_start + ratio * m_duration;
+			return m_start + ratio * getDuration();
 		}
 	};
 
-	// input timestamps are realtime, while m_timestamp only advances by gametime
-	// which speedhack, timewarp and the rounding to whole ticks (leftover carried to the next frame) stretch or shrink
-	struct FrameTiming {
-		// m_timestamp on entry, vanilla sets it to the previous frame's clock read
-		static inline double m_realStart = 0.0;
-		static inline double m_realEnd = 0.0; // clock read at the start of this frame
-		static inline int m_tickCount = 1;
-		static inline int m_tickIndex = 0;
-
-		// only set once getModifiedDelta runs, which vanilla skips while paused or not started
-		static inline std::optional<TickDts> m_tickDts;
-
-		// the dt processQueuedButtons gets is vanilla's real tick length cast to float, which loses precision
-		// and isn't what the player physics use under time warp, so use the exact values from getModifiedDelta instead
-		static TickDts getTickDts(float dt) {
-			return m_tickDts.value_or(TickDts{dt, 60.0f * dt});
+	// input timestamps are realtime, while m_timestamp is a mix of realtime and gametime,
+	// set to the previous frame's clock read then advanced by each tick's gametime
+	// which speedhack, timewarp, and the rounding to whole ticks stretch or shrink
+	// so the frame's real span is captured before that and split across its ticks instead
+	class FrameTiming {
+		public:
+		static void beginFrame() {
+			// vanilla re-runs update for the leftover ticks when timewarp changes mid frame
+			// by which point m_timestamp is already this frame's clock read
+			// so the outer frame is kept to carry its leftover span
+			m_outerFrame = m_inFrameUpdate ? m_frameInfo : std::nullopt;
+			m_frameInfo.reset();
+			m_inFrameUpdate = true;
 		}
 
-		static TickWindow getTickWindow(GJBaseGameLayer* gameLayer, float dt) {
-			bool hasRealSpan = m_tickDts && m_realEnd > m_realStart;
-			if (!hasRealSpan) {
-				return {gameLayer->m_timestamp, dt};
+		static void endFrame() {
+			m_inFrameUpdate = false;
+			m_frameInfo.reset();
+			m_outerFrame.reset();
+		}
+
+		static void setFrameInfo(FrameInfo frameInfo) {
+			if (!m_inFrameUpdate) return;
+
+			bool isRerun = m_outerFrame.has_value() && m_outerFrame->m_lastTickEnd.has_value();
+			if (isRerun) {
+				frameInfo.m_realStart = *m_outerFrame->m_lastTickEnd;
+				frameInfo.m_realEnd = m_outerFrame->m_realEnd;
 			}
 
-			double tickDuration = (m_realEnd - m_realStart) / m_tickCount;
-			double tickStartTime = m_realStart + m_tickIndex * tickDuration;
-			return {tickStartTime, tickDuration};
+			m_frameInfo = frameInfo;
+		}
+
+		static void advanceTick(float tickDt) {
+			if (!m_frameInfo.has_value()) return;
+
+			// remembered for a timewarp re-run, see beginFrame
+			auto tickInfo = getTickInfoFromFrame(*m_frameInfo, tickDt);
+			m_frameInfo->m_lastTickEnd = tickInfo.m_end;
+
+			m_frameInfo->m_tickIndex++;
+		}
+
+		static TickInfo getTickInfo(PlayLayer* playLayer, float tickDt) {
+			if (!m_frameInfo.has_value()) {
+				return {
+					.m_realDt = tickDt,
+					.m_physicsDt = 60.0f * tickDt,
+					.m_start = playLayer->m_timestamp,
+					.m_end = playLayer->m_timestamp + tickDt,
+				};
+			}
+
+			return getTickInfoFromFrame(*m_frameInfo, tickDt);
+		}
+
+		private:
+		// only set once getModifiedDelta runs inside update, which vanilla skips while paused or not started
+		static inline std::optional<FrameInfo> m_frameInfo;
+		static inline std::optional<FrameInfo> m_outerFrame; // the frame a timewarp re-run continues from
+		static inline bool m_inFrameUpdate = false;
+
+		// tickDt is vanilla's frameDelta / timeWarp / tickCount cast to float
+		// which loses precision, still includes game speed, and isn't what the player physics use under timewarp
+		// so vanilla's exact calculations are used when the tick count is known
+		static TickInfo getTickInfoFromFrame(const FrameInfo& frameInfo, float tickDt) {
+			std::optional<int> tickCount = getFrameTickCount(frameInfo, tickDt);
+			
+			float timeScale = frameInfo.m_timeScale > 0.0f ? frameInfo.m_timeScale : frameInfo.m_timeWarp;
+
+			double realDt;
+			float physicsDt;
+			if (tickCount.has_value()) {
+				double frameDelta = frameInfo.m_delta;
+				realDt = frameDelta / timeScale / *tickCount;
+				physicsDt = static_cast<float>(frameDelta * 60.0 / *tickCount);
+			} else {
+				// approximation from dt alone, the physics dt can be off by a float rounding step
+				realDt = tickDt * frameInfo.m_timeWarp / timeScale;
+				physicsDt = static_cast<float>(tickDt * frameInfo.m_timeWarp * 60.0);
+			}
+
+			double frameSpan = frameInfo.m_realEnd - frameInfo.m_realStart;
+			double tickDuration = (frameSpan > 0.0 && tickCount.has_value()) ? frameSpan / *tickCount : realDt;
+			double tickStart = frameInfo.m_realStart + frameInfo.m_tickIndex * tickDuration;
+
+			return {
+				.m_realDt = realDt,
+				.m_physicsDt = physicsDt,
+				.m_start = tickStart,
+				.m_end = tickStart + tickDuration,
+			};
+		}
+
+		// vanilla doesn't store its tick count and tps bypasses change it
+		// so it's worked out from the dt processCommands gets, which vanilla computes as delta / timeWarp / ticks
+		// only trusted if it reproduces that dt exactly, otherwise the delta sip saw isn't the one vanilla used
+		static std::optional<int> getFrameTickCount(const FrameInfo& frameInfo, float tickDt) {
+			double realFrameDelta = frameInfo.m_delta / frameInfo.m_timeWarp;
+			int tickCountThisFrame = std::max(1, static_cast<int>(std::round(realFrameDelta / tickDt)));
+
+			bool tickCountMatches = static_cast<float>(realFrameDelta / tickCountThisFrame) == tickDt;
+
+			// can't think of anything that would actually cause this to happen
+			if (!tickCountMatches) return std::nullopt;
+
+			return tickCountThisFrame;
 		}
 	};
 } // namespace
@@ -90,38 +182,28 @@ class $modify(GJBaseGameLayer) {
 	}
 
 	void update(float dt) {
-		FrameTiming::m_realStart = this->m_timestamp;
-		FrameTiming::m_realEnd = utils::getInputTimestamp();
-		FrameTiming::m_tickIndex = 0;
-		FrameTiming::m_tickDts.reset();
-
+		FrameTiming::beginFrame();
 		GJBaseGameLayer::update(dt);
-
-		FrameTiming::m_tickDts.reset();
+		FrameTiming::endFrame();
 	}
 
 	double getModifiedDelta(float dt) {
 		double delta = GJBaseGameLayer::getModifiedDelta(dt);
 
-		// same calculations vanilla does in update
-		float timeWarp = this->m_gameState.m_timeWarp;
-		float tickCount = std::round(static_cast<float>(delta * 60.0 / std::min(timeWarp, 1.0f) * 4.0));
-		int ticks = std::max(1, static_cast<int>(tickCount));
-
-		// applyTimeWarp also scales by 2.209 practice game speed setting while playing,
-		// which vanilla's delta / m_timeWarp doesn't remove
-		float gameSpeed = (std::abs(this->m_unk3380 - 1.0f) >= 0.01f && !this->m_unk7be) ? this->m_unk3380 : 1.0f;
-
-		FrameTiming::m_tickCount = ticks;
-		FrameTiming::m_tickDts =
-			TickDts{delta / timeWarp / gameSpeed / ticks, static_cast<float>(delta * 60.0 / ticks)};
+		FrameTiming::setFrameInfo({
+			.m_realStart = this->m_timestamp,
+			.m_realEnd = utils::getInputTimestamp(),
+			.m_delta = delta,
+			.m_timeWarp = this->m_gameState.m_timeWarp,
+			.m_timeScale = CCDirector::sharedDirector()->getScheduler()->getTimeScale(),
+		});
 
 		return delta;
 	}
 
 	void processCommands(float dt, bool isHalfTick, bool isLastTick) {
 		GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
-		FrameTiming::m_tickIndex++;
+		FrameTiming::advanceTick(dt);
 	}
 };
 
@@ -305,8 +387,8 @@ namespace {
 		double m_preDisp = 0.0; // what a full tick of displacement would have been before the input
 		float m_prePos = 0.0f;
 
-		PlayerTickState(PlayerObject* player, const TickDts& tickDts)
-			: m_player(player), m_physicsDt(tickDts.m_physics), m_scaledDt(tickDts.m_physics * 0.9f) {
+		PlayerTickState(PlayerObject* player, const TickInfo& tickInfo)
+			: m_player(player), m_physicsDt(tickInfo.m_physicsDt), m_scaledDt(tickInfo.m_physicsDt * 0.9f) {
 			if (!m_player) return;
 
 			// apply the velocity correction carried over from last tick before anything reads it
@@ -395,10 +477,8 @@ static void processInputs(float dt, bool processEntireQueue) {
 
 	auto& inputQueue = playLayer->m_queuedButtons;
 
-	auto tickDts = FrameTiming::getTickDts(dt);
-	double inputSamplesPerTick = config::inputHz * tickDts.m_real; // realtime since input hz is real time
-	float scaledDt = tickDts.m_physics * 0.9f;					   // what PlayerObject::update passes to updateJump
-	auto tickWindow = FrameTiming::getTickWindow(playLayer, dt);
+	auto tickInfo = FrameTiming::getTickInfo(playLayer, dt);
+	double inputSamplesPerTick = config::inputHz * tickInfo.m_realDt; // realDt since input hz is realtime
 
 	bool isDual = playLayer->m_gameState.m_isDualMode;
 
@@ -416,14 +496,14 @@ static void processInputs(float dt, bool processEntireQueue) {
 	}
 
 	PlayerTickState playerStates[2] = {
-		PlayerTickState(p1, tickDts),
-		PlayerTickState(p2, tickDts),
+		PlayerTickState(p1, tickInfo),
+		PlayerTickState(p2, tickInfo),
 	};
 
 	size_t processedCount = 0;
 
 	for (const auto& input : inputQueue) {
-		double rawRatio = tickWindow.getRatioFromTimestamp(input.m_timestamp);
+		double rawRatio = tickInfo.getRatioFromTimestamp(input.m_timestamp);
 
 		// past the end of this tick, so it belongs to a later one
 		if (!processEntireQueue && rawRatio >= 1.0) break;
@@ -464,14 +544,13 @@ namespace subtickinputs::api {
 		auto* playLayer = PlayLayer::get();
 		if (!playLayer) return Err("playlayer is null");
 
-		double inputSamplesPerTick = config::inputHz * FrameTiming::getTickDts(dt).m_real;
-
-		auto tickWindow = FrameTiming::getTickWindow(playLayer, dt);
+		auto tickInfo = FrameTiming::getTickInfo(playLayer, dt);
+		double inputSamplesPerTick = config::inputHz * tickInfo.m_realDt;
 
 		std::vector<PlayerButtonCommandWithRatio> result;
 
 		for (const auto& input : playLayer->m_queuedButtons) {
-			double ratio = tickWindow.getRatioFromTimestamp(input.m_timestamp);
+			double ratio = tickInfo.getRatioFromTimestamp(input.m_timestamp);
 
 			// only inputs inside this tick get quantized
 			bool isInThisTick = ratio >= 0.0 && ratio < 1.0;
@@ -487,13 +566,13 @@ namespace subtickinputs::api {
 		auto* playLayer = PlayLayer::get();
 		if (!playLayer) return Err("playlayer is null");
 
-		auto tickWindow = FrameTiming::getTickWindow(playLayer, dt);
+		auto tickInfo = FrameTiming::getTickInfo(playLayer, dt);
 
 		// no way this works 😂
 		playLayer->m_queuedButtons.clear();
 		for (auto& inputWithRatio : inputQueue) {
 			auto& inputWithoutRatio = inputWithRatio.input;
-			inputWithoutRatio.m_timestamp = tickWindow.getTimestampFromRatio(inputWithRatio.ratio);
+			inputWithoutRatio.m_timestamp = tickInfo.getTimestampFromRatio(inputWithRatio.ratio);
 			playLayer->m_queuedButtons.push_back(inputWithoutRatio);
 		}
 
