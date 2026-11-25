@@ -1,11 +1,12 @@
 name: Bug Report
 description: report a bug 😮
-labels: [bug]
+type: Bug
 body:
   - type: markdown
     attributes:
       value: |
         ## Bug Report
+        before reporting, please test with **only SIP enabled** if you can 🙏
 
   - type: textarea
     id: mods-list
@@ -16,28 +17,46 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: sip-only
+    attributes:
+      label: Does it still happen with only SIP enabled?
+      options: ["Yes", "No", "Haven't tested"]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cbf
+    attributes:
+      label: Does it happen with syzzi's CBF?
+      options: ["Yes", "No", "Haven't tested"]
+
   - type: textarea
     id: bug-description
     attributes:
       label: Bug Description
-      description: describe the issue with steps to reproduce it, especially if you have no screenshots or recordings. if possible, indicate if the bug happens with syzzi's cbf.
+      description: what happened, what you expected, and steps to reproduce (level name/ID and percentage help a lot if it's a specific level)
       placeholder: your mod is the best! 😁
     validations:
       required: true
 
   - type: textarea
+    id: crashlog
+    attributes:
+      label: Crash Log
+      description: if the game crashed, paste the newest file from geode's crashlogs folder
+      render: shell
+
+  - type: textarea
     id: media
     attributes:
       label: Media
-      description: if possible, put any images or videos related to the bug here
-    validations:
-      required: false
+      description: images or videos of the bug
 
   - type: dropdown
     id: platform
     attributes:
       label: Platform
-      description: pick the platform you saw the bug occurring
       options:
       - "Windows"
       - "Mac (Intel)"
@@ -46,18 +65,17 @@ body:
       - "Android (64-bit)"
       - "iOS (JIT)"
       - "iOS (Jitless)"
-      - "Linux"
+      - "Linux (Wine/Proton)"
     validations:
       required: true
-      
+
   - type: checkboxes
     id: verification
     attributes:
       label: Verification
       options:
       - label: I verify that Superb Input Precision is fully updated.
-    validations:
-      required: true
+        required: true
 
   - type: markdown
     attributes:
