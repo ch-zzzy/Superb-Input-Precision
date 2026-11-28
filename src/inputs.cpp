@@ -117,7 +117,7 @@ namespace {
 		// so vanilla's exact calculations are used when the tick count is known
 		static TickInfo getTickInfoFromFrame(const FrameInfo& frameInfo, float tickDt) {
 			std::optional<int> tickCount = getFrameTickCount(frameInfo, tickDt);
-			
+
 			float timeScale = frameInfo.m_timeScale > 0.0f ? frameInfo.m_timeScale : frameInfo.m_timeWarp;
 
 			double realDt;
@@ -127,7 +127,6 @@ namespace {
 				realDt = frameDelta / timeScale / *tickCount;
 				physicsDt = static_cast<float>(frameDelta * 60.0 / *tickCount);
 			} else {
-				// approximation from dt alone, the physics dt can be off by a float rounding step
 				realDt = tickDt * frameInfo.m_timeWarp / timeScale;
 				physicsDt = static_cast<float>(tickDt * frameInfo.m_timeWarp * 60.0);
 			}
@@ -146,7 +145,6 @@ namespace {
 
 		// vanilla doesn't store its tick count and tps bypasses change it
 		// so it's worked out from the dt processCommands gets, which vanilla computes as delta / timeWarp / ticks
-		// only trusted if it reproduces that dt exactly, otherwise the delta sip saw isn't the one vanilla used
 		static std::optional<int> getFrameTickCount(const FrameInfo& frameInfo, float tickDt) {
 			double realFrameDelta = frameInfo.m_delta / frameInfo.m_timeWarp;
 			int tickCountThisFrame = std::max(1, static_cast<int>(std::round(realFrameDelta / tickDt)));
@@ -154,7 +152,15 @@ namespace {
 			bool tickCountMatches = static_cast<float>(realFrameDelta / tickCountThisFrame) == tickDt;
 
 			// can't think of anything that would actually cause this to happen
-			if (!tickCountMatches) return std::nullopt;
+			if (!tickCountMatches) {
+				static bool s_warned = false;
+				if (!s_warned) {
+					log::warn("tick count not found: delta {}, timeWarp {}, tickDt {}, guessed tickCount {}",
+						frameInfo.m_delta, frameInfo.m_timeWarp, tickDt, tickCountThisFrame);
+					s_warned = true;
+				}
+				return std::nullopt;
+			}
 
 			return tickCountThisFrame;
 		}
